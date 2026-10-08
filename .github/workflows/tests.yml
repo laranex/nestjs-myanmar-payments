@@ -1,0 +1,79 @@
+name: tests
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+  # release.yml runs the suite before publishing a tag.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['20', '22', '24']
+        nest: ['10', '11', '12']
+        include:
+          # The optional integrations that match each NestJS major.
+          - nest: '10'
+            extras: '@nestjs/config@3 @nestjs/cache-manager@2 cache-manager@5'
+          - nest: '11'
+            extras: '@nestjs/config@4 @nestjs/cache-manager@3 cache-manager@6'
+
+    name: Node ${{ matrix.node }} - NestJS ${{ matrix.nest }} - ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # package-lock.json pins the newest NestJS major (the dev dependencies); older majors are
+      # installed over it without touching the lock file.
+      - name: Install NestJS ${{ matrix.nest }}
+        if: matrix.nest != '12'
+        shell: bash
+        run: |
+          npm install --no-save \
+            "@nestjs/common@${{ matrix.nest }}" "@nestjs/core@${{ matrix.nest }}" \
+            "@nestjs/testing@${{ matrix.nest }}" "@nestjs/platform-express@${{ matrix.nest }}" \
+            "@nestjs/platform-fastify@${{ matrix.nest }}" ${{ matrix.extras }}
+          npm ls @nestjs/core @nestjs/config @nestjs/cache-manager || true
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Test the build
+        run: npm run test:dist
+
+      - name: Check the package (publint, are-the-types-wrong)
+        run: npm run check:package
