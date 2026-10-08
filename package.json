@@ -90,7 +90,7 @@
     "@nestjs/platform-express": "^12.1.2",
     "@nestjs/platform-fastify": "^12.1.2",
     "@nestjs/testing": "^12.1.2",
-    "@types/node": "^20.19.0",
+    "@types/node": "^26.6.4",
     "@types/supertest": "^7.2.1",
     "@vitest/coverage-v8": "^4.1.11",
     "cache-manager": "^7.2.9",
