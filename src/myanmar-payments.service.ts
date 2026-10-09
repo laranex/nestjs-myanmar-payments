@@ -150,6 +150,11 @@ export class MyanmarPaymentsService {
       );
     }
     const ttlMinutes = this.options.formLink?.ttlMinutes ?? DEFAULT_FORM_TTL_MINUTES;
+    if (!Number.isFinite(ttlMinutes) || ttlMinutes <= 0) {
+      throw new RangeError(
+        `formLink.ttlMinutes must be a positive number of minutes, got ${String(ttlMinutes)}.`,
+      );
+    }
     const payload = this.formCipher(true).seal(form, nowSeconds() + Math.round(ttlMinutes * 60));
     const baseUrl = (this.options.formLink?.baseUrl ?? envValue(this.env, 'APP_URL') ?? '').replace(
       /\/+$/,

@@ -18,7 +18,7 @@ export interface FormLinkOptions {
    * `MYANMAR_PAYMENTS_FORM_KEY`, then `APP_KEY`. A `base64:` prefix is decoded first.
    */
   secret?: string | Uint8Array | undefined;
-  /** How long a link stays valid, in minutes (default 30). */
+  /** How long a link stays valid, in minutes (default 30); must be positive. */
   ttlMinutes?: number | undefined;
   /** The scheme and host links start with. Defaults to `APP_URL`; without it links are relative. */
   baseUrl?: string | undefined;

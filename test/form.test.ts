@@ -167,6 +167,21 @@ describe('form route options', () => {
     }
   });
 
+  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects a ttlMinutes of %s',
+    async (ttlMinutes) => {
+      const app = await createApp({
+        adapter: 'express',
+        imports: [MyanmarPaymentsModule.forRoot({ env: ENV, formLink: { ttlMinutes } })],
+      });
+      try {
+        expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(RangeError);
+      } finally {
+        await app.close();
+      }
+    },
+  );
+
   it('can be disabled', async () => {
     const app = await createApp({
       adapter: 'express',
