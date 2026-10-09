@@ -14,3 +14,6 @@ Initial release. The version number matches the other Laranex Myanmar payments p
 - Yoma MMQR access tokens are kept in the `@nestjs/cache-manager` cache when it is registered (`CacheManagerTokenCache`), in memory otherwise.
 - NestJS 10, 11 and 12 (rxjs 7.1 or later), Node.js 20+, ES modules and CommonJS with type declarations; CI also runs the lowest accepted versions.
 - Agent skill in `skills/nestjs-myanmar-payments`; install it with `npx skills add laranex/nestjs-myanmar-payments`.
+
+### Changed since the pre-releases
+- Built on a `@laranex/myanmar-payments` version where `PaymentStatus.Cancelled` (`'cancelled'`) is renamed to `PaymentStatus.Canceled` (`'canceled'`); update code or stored statuses from the `v4.0.0-dev` pre-releases.

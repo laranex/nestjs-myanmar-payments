@@ -99,7 +99,7 @@ handle(@VerifiedCallback('kbz-pay') callback: PaymentCallback): PaymentCallback 
 ### Status checks and errors
 
 - `kbzPay().status(orderId)`, `ayaPay().status(orderId)` and `yomaMmqr().status(reference)` return a `PaymentStatusResult`; Wave Money and CyberSource have no status API.
-- Statuses: `PaymentStatus.Successful`, `Pending`, `Failed`, `Cancelled`, `Expired`, `Unknown`.
+- Statuses: `PaymentStatus.Successful`, `Pending`, `Failed`, `Canceled`, `Expired`, `Unknown`.
 - Gateway failures throw `ApiError`; invalid data throws `InvalidPaymentDataError` with `errors` per field.
 
 ## Test your app
