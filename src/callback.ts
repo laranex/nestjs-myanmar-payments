@@ -18,7 +18,9 @@ import {
   type PipeTransform,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
-import { map, type Observable } from 'rxjs';
+import type { Observable } from 'rxjs';
+// `rxjs/operators` rather than the `rxjs` root, which exports operators only since 7.2.
+import { map } from 'rxjs/operators';
 
 import type { GatewayName } from './gateways.js';
 import { MyanmarPaymentsService } from './myanmar-payments.service.js';
