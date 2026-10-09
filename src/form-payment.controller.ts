@@ -5,7 +5,9 @@ import {
   Inject,
   Query,
   Res,
+  UseGuards,
   VERSION_NEUTRAL,
+  type CanActivate,
   type Type,
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
@@ -38,9 +40,15 @@ export class FormPaymentController {
   }
 }
 
-/** A {@link FormPaymentController} mounted at `path`. @internal */
-export function formPaymentController(path: string): Type<FormPaymentController> {
+/** A {@link FormPaymentController} mounted at `path`, behind `guards`. @internal */
+export function formPaymentController(
+  path: string,
+  guards: (CanActivate | Type<CanActivate>)[] = [],
+): Type<FormPaymentController> {
   class MyanmarPaymentsFormController extends FormPaymentController {}
   Controller({ path, version: VERSION_NEUTRAL })(MyanmarPaymentsFormController);
+  if (guards.length > 0) {
+    UseGuards(...guards)(MyanmarPaymentsFormController);
+  }
   return MyanmarPaymentsFormController;
 }

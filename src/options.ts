@@ -1,3 +1,4 @@
+import type { CanActivate, Type } from '@nestjs/common';
 import type {
   EnvSource,
   FetchFunction,
@@ -52,6 +53,11 @@ export interface FormRouteOptions {
   enabled?: boolean | undefined;
   /** The route path (default `myanmar-payments/form`); the app's global prefix applies. */
   path?: string | undefined;
+  /**
+   * Guards for the route, as classes or instances, e.g. a `ThrottlerGuard`. Don't add
+   * authentication: the customer may arrive from a gateway or another device.
+   */
+  guards?: (CanActivate | Type<CanActivate>)[] | undefined;
 }
 
 /** Options given to `forRoot()` / `forRootAsync()` directly, never through a factory. */
@@ -66,4 +72,5 @@ export interface MyanmarPaymentsModuleExtras {
 export interface ResolvedFormRoute {
   enabled: boolean;
   path: string;
+  guards: (CanActivate | Type<CanActivate>)[];
 }
