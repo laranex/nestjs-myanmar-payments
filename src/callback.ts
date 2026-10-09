@@ -92,7 +92,7 @@ export class VerifiedCallbackPipe implements PipeTransform<
 
 /**
  * Turns a `PaymentCallback` returned by a handler into the acknowledgement the gateway expects:
- * its body and headers with status 200. Other values pass through unchanged.
+ * its status, headers and body. Other values pass through unchanged.
  */
 @Injectable()
 export class AcknowledgementInterceptor implements NestInterceptor {
@@ -106,6 +106,7 @@ export class AcknowledgementInterceptor implements NestInterceptor {
         }
         const response: unknown = context.switchToHttp().getResponse();
         const adapter = this.adapterHost.httpAdapter;
+        adapter.status(response, value.acknowledgement.status);
         for (const [name, header] of Object.entries(value.acknowledgement.headers)) {
           adapter.setHeader(response, name, header);
         }
@@ -117,8 +118,8 @@ export class AcknowledgementInterceptor implements NestInterceptor {
 
 /**
  * Answers with the gateway's acknowledgement when the handler returns the `PaymentCallback`:
- * `@HttpCode(200)` plus the {@link AcknowledgementInterceptor}. Every gateway acknowledges with
- * 200.
+ * `@HttpCode(200)` for other return values, plus the {@link AcknowledgementInterceptor}, which
+ * sets the acknowledgement's own status (200 for every gateway).
  */
 export function AcknowledgeCallback(): MethodDecorator & ClassDecorator {
   return applyDecorators(HttpCode(200), UseInterceptors(AcknowledgementInterceptor));

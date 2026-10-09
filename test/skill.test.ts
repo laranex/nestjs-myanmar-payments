@@ -64,6 +64,8 @@ for (const module of modules.slice(0, 2)) {
 const local = new Set([
   'AppModule',
   'CheckoutController',
+  'PaymentCallbackController',
+  'Promise',
   'NestFactory',
   'Response',
   'JSON',

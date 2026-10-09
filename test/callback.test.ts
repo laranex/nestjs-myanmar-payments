@@ -63,6 +63,16 @@ class CallbackController {
     return callback;
   }
 
+  /** An acknowledgement with its own status: the interceptor answers with it. */
+  @Post('accepted')
+  @AcknowledgeCallback()
+  accepted(): Pick<PaymentCallback, 'orderId' | 'acknowledgement'> {
+    return {
+      orderId: 'ORDER_1',
+      acknowledgement: new Acknowledgement({ status: 202, body: 'queued' }),
+    };
+  }
+
   /** Not a callback: the interceptor passes other values through. */
   @Post('echo')
   @AcknowledgeCallback()
@@ -158,6 +168,13 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
         .send(tampered.body);
       expect(rejected.status).toBe(400);
       expect(rejected.text).toBe('invalid signature');
+    });
+
+    it("answers with the acknowledgement's own status", async () => {
+      const response = await request(app.getHttpServer()).post('/payments/callback/accepted');
+      expect(response.status).toBe(202);
+      expect(response.text).toBe('queued');
+      expect(response.headers['content-type']).toMatch(/^text\/plain/);
     });
 
     it('passes other return values through', async () => {

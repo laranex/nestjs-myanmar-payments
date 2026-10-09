@@ -58,7 +58,7 @@ export class MyanmarPaymentsService {
     @Optional() @Inject(ApplicationConfig) private readonly appConfig?: ApplicationConfig,
   ) {
     this.env = envSource(options.env);
-    this.formRoute = formRoute ?? { enabled: true, path: DEFAULT_FORM_PATH };
+    this.formRoute = formRoute ?? { enabled: true, path: DEFAULT_FORM_PATH, guards: [] };
     this.tokenCache =
       options.tokenCache ??
       (options.useCacheManager !== false && CacheManagerTokenCache.supports(cacheManager)

@@ -1,7 +1,12 @@
 import { createCipheriv, hkdfSync, randomBytes } from 'node:crypto';
 
 import { Amount, ConfigurationError, FormPayment } from '@laranex/myanmar-payments';
-import type { INestApplication } from '@nestjs/common';
+import {
+  Injectable,
+  type CanActivate,
+  type ExecutionContext,
+  type INestApplication,
+} from '@nestjs/common';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -84,7 +89,35 @@ describe.each(ADAPTERS)('form route on %s', (adapter) => {
   );
 });
 
+/** Lets a request through only with an `x-allowed: yes` header. */
+@Injectable()
+class HeaderGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<{ headers: Record<string, unknown> }>();
+    return req.headers['x-allowed'] === 'yes';
+  }
+}
+
 describe('form route options', () => {
+  it.each(ADAPTERS)('applies guards to the route on %s', async (adapter) => {
+    for (const guard of [HeaderGuard, new HeaderGuard()]) {
+      const app = await createApp({
+        adapter,
+        imports: [MyanmarPaymentsModule.forRoot({ env: ENV, formRoute: { guards: [guard] } })],
+      });
+      try {
+        const url = app.get(MyanmarPaymentsService).autoSubmitUrl(form);
+        const path = url.replace('https://shop.test', '');
+        expect((await request(app.getHttpServer()).get(path)).status).toBe(403);
+        const allowed = await request(app.getHttpServer()).get(path).set('x-allowed', 'yes');
+        expect(allowed.status).toBe(200);
+        expect(allowed.text).toBe(form.toHtml());
+      } finally {
+        await app.close();
+      }
+    }
+  });
+
   it('follows the global prefix and a custom path', async () => {
     const app = await createApp({
       adapter: 'fastify',
