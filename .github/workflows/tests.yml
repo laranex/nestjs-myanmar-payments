@@ -77,3 +77,43 @@ jobs:
 
       - name: Check the package (publint, are-the-types-wrong)
         run: npm run check:package
+
+  # The lowest versions package.json accepts: NestJS 10.0.0 with the oldest optional integrations,
+  # rxjs 7.1.0 and the SDK floor from package-lock.json. The build comes from the locked
+  # dependencies first, because rxjs 7.1.0 ships no type declarations TypeScript can resolve
+  # through its exports.
+  lowest:
+    runs-on: ubuntu-latest
+
+    name: Node 20 - lowest dependencies
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install the lowest versions
+        run: |
+          npm install --no-save \
+            @nestjs/common@10.0.0 @nestjs/core@10.0.0 @nestjs/testing@10.0.0 \
+            @nestjs/platform-express@10.0.0 @nestjs/platform-fastify@10.0.0 \
+            @nestjs/config@3.0.0 @nestjs/cache-manager@2.0.0 cache-manager@5.0.0 \
+            rxjs@7.1.0 reflect-metadata@0.1.13
+          npm ls @laranex/myanmar-payments @nestjs/core rxjs || true
+
+      - name: Test
+        run: npm run test:coverage
+
+      - name: Test the build
+        run: npm run test:dist
