@@ -19,8 +19,11 @@ export interface FormLinkOptions {
    * `MYANMAR_PAYMENTS_FORM_KEY`, then `APP_KEY`. A `base64:` prefix is decoded first.
    */
   secret?: string | Uint8Array | undefined;
-  /** How long a link stays valid, in minutes (default 30); must be positive. */
-  ttlMinutes?: number | undefined;
+  /**
+   * How long a link stays valid, in minutes: a whole number greater than 0 (or its text).
+   * Required to build links; defaults to `MYANMAR_PAYMENTS_FORM_TTL_MINUTES`.
+   */
+  ttlMinutes?: number | string | undefined;
   /** The scheme and host links start with. Defaults to `APP_URL`; without it links are relative. */
   baseUrl?: string | undefined;
 }
@@ -35,10 +38,12 @@ export interface MyanmarPaymentsModuleOptions extends MyanmarPaymentsConfig {
   env?: EnvSource | ConfigReader | undefined;
   /** The `fetch` gateways call, e.g. a fake one in tests. */
   fetch?: FetchFunction | undefined;
-  /** Sends gateway requests; takes precedence over `fetch` and `timeoutMs`. */
+  /**
+   * Sends gateway requests, with its own timeout; takes precedence over `fetch`. Without one,
+   * each gateway uses the SDK's fetch client with its config's `timeoutSeconds`
+   * (`MYANMAR_PAYMENTS_HTTP_TIMEOUT` from the environment).
+   */
   httpClient?: HttpClient | undefined;
-  /** Milliseconds before a gateway call is aborted. Defaults to `MYANMAR_PAYMENTS_HTTP_TIMEOUT` seconds, then 30 s. */
-  timeoutMs?: number | undefined;
   /** Keeps Yoma MMQR's access token. Defaults to Nest's cache manager when present, else memory. */
   tokenCache?: TokenCache | undefined;
   /** Use the `CACHE_MANAGER` of `@nestjs/cache-manager` when it is available (default `true`). */

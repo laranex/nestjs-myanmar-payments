@@ -10,12 +10,7 @@ import {
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import {
-  DEFAULT_FORM_PATH,
-  DEFAULT_FORM_TTL_MINUTES,
-  MyanmarPaymentsModule,
-  MyanmarPaymentsService,
-} from '../src/index.js';
+import { DEFAULT_FORM_PATH, MyanmarPaymentsModule, MyanmarPaymentsService } from '../src/index.js';
 import { FormLinkCipher } from '../src/form-link.js';
 import { ADAPTERS, createApp, ENV } from './helpers.js';
 
@@ -72,7 +67,7 @@ describe.each(ADAPTERS)('form route on %s', (adapter) => {
 
   it('answers 410 to an expired link', async () => {
     const payload = payloadOf(payments.autoSubmitUrl(form));
-    const later = Date.now() + (DEFAULT_FORM_TTL_MINUTES * 60 + 5) * 1000;
+    const later = Date.now() + (Number(ENV.MYANMAR_PAYMENTS_FORM_TTL_MINUTES) * 60 + 5) * 1000;
     vi.spyOn(Date, 'now').mockReturnValue(later);
     const response = await request(app.getHttpServer()).get(
       `/${DEFAULT_FORM_PATH}?payload=${payload}`,
@@ -169,7 +164,10 @@ describe('form route options', () => {
       adapter: 'express',
       imports: [
         MyanmarPaymentsModule.forRoot({
-          env: { APP_KEY: `base64:${randomBytes(32).toString('base64')}` },
+          env: {
+            APP_KEY: `base64:${randomBytes(32).toString('base64')}`,
+            MYANMAR_PAYMENTS_FORM_TTL_MINUTES: '30',
+          },
         }),
       ],
     });
@@ -185,7 +183,9 @@ describe('form route options', () => {
   it('needs a secret', async () => {
     const app = await createApp({
       adapter: 'express',
-      imports: [MyanmarPaymentsModule.forRoot({ env: {} })],
+      imports: [
+        MyanmarPaymentsModule.forRoot({ env: { MYANMAR_PAYMENTS_FORM_TTL_MINUTES: '30' } }),
+      ],
     });
     try {
       const payments = app.get(MyanmarPaymentsService);
@@ -200,7 +200,7 @@ describe('form route options', () => {
     }
   });
 
-  it.each([0, -5, Number.NaN, Number.POSITIVE_INFINITY])(
+  it.each([0, -5, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 'five', '0', '1.5'])(
     'rejects a ttlMinutes of %s',
     async (ttlMinutes) => {
       const app = await createApp({
@@ -208,12 +208,58 @@ describe('form route options', () => {
         imports: [MyanmarPaymentsModule.forRoot({ env: ENV, formLink: { ttlMinutes } })],
       });
       try {
-        expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(RangeError);
+        expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(
+          new ConfigurationError('form_route', 'ttl_minutes', true),
+        );
+        expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(
+          'The form_route configuration [ttl_minutes] must be a whole number greater than 0.',
+        );
       } finally {
         await app.close();
       }
     },
   );
+
+  it.each([undefined, '', '  '])('needs a ttlMinutes, not %j', async (ttl) => {
+    const env: Record<string, string> = { ...ENV };
+    delete env.MYANMAR_PAYMENTS_FORM_TTL_MINUTES;
+    if (ttl !== undefined) {
+      env.MYANMAR_PAYMENTS_FORM_TTL_MINUTES = ttl;
+    }
+    const app = await createApp({
+      adapter: 'express',
+      imports: [MyanmarPaymentsModule.forRoot({ env })],
+    });
+    try {
+      expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(
+        'The form_route configuration is missing [ttl_minutes].',
+      );
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('reads the lifetime as text from the environment', async () => {
+    const app = await createApp({
+      adapter: 'express',
+      imports: [
+        MyanmarPaymentsModule.forRoot({
+          env: { ...ENV, MYANMAR_PAYMENTS_FORM_TTL_MINUTES: ' 2 ' },
+        }),
+      ],
+    });
+    try {
+      const payments = app.get(MyanmarPaymentsService);
+      const start = Date.now();
+      const payload = payloadOf(payments.autoSubmitUrl(form));
+      vi.spyOn(Date, 'now').mockReturnValue(start + 61_000);
+      expect(payments.resolveFormPayment(payload)).toEqual(form);
+      vi.spyOn(Date, 'now').mockReturnValue(start + 125_000);
+      expect(payments.resolveFormPayment(payload)).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  });
 
   it('can be disabled', async () => {
     const app = await createApp({
@@ -241,6 +287,9 @@ describe('form route options', () => {
         orderId: 'ORD-2',
         amount: Amount.parse('10.50'),
         callbackUrl: 'https://shop.test/payments/callback/cyber-source',
+        currency: 'MMK',
+        transactionType: 'sale',
+        locale: 'en-us',
       });
       const url = payments.autoSubmitUrl(payment);
       const response = await request(app.getHttpServer()).get(url.replace('https://shop.test', ''));

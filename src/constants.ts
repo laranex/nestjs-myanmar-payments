@@ -20,6 +20,3 @@ export const CACHE_MANAGER = 'CACHE_MANAGER';
 
 /** The default path of the auto-submit form route. */
 export const DEFAULT_FORM_PATH = 'myanmar-payments/form';
-
-/** How long an auto-submit form link stays valid by default, in minutes. */
-export const DEFAULT_FORM_TTL_MINUTES = 30;
