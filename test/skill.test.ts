@@ -132,7 +132,6 @@ describe('the agent skill', () => {
       'cyberSource',
       'fetch',
       'httpClient',
-      'timeoutMs',
       'tokenCache',
       'useCacheManager',
       'formLink',

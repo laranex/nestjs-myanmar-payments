@@ -53,7 +53,10 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(payments.yomaMmqr()).toBeInstanceOf(YomaMmqr);
     expect(payments.cyberSource()).toBeInstanceOf(CyberSource);
     expect(payments.kbzPay().config.appId).toBe('kp123');
-    expect(payments.kbzPay().config.sandbox).toBe(true);
+    expect(payments.kbzPay().config.apiUrl).toBe(KbzPayConfig.PRODUCTION_API_URL);
+    expect(payments.kbzPay().config.timeoutSeconds).toBe(30);
+    expect(payments.waveMoney().config.timeToLiveSeconds).toBe(300);
+    expect(payments.yomaMmqr().config.apiVersion).toBe('v1rc');
   });
 
   it('reuses each gateway', async () => {
@@ -66,27 +69,32 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     vi.stubEnv('KBZ_PAY_APP_ID', 'from-process');
     vi.stubEnv('KBZ_PAY_APP_KEY', 'key');
     vi.stubEnv('KBZ_PAY_MERCHANT_CODE', 'code');
-    vi.stubEnv('KBZ_PAY_SANDBOX', 'false');
+    vi.stubEnv('MYANMAR_PAYMENTS_HTTP_TIMEOUT', '12');
     const payments = await service([MyanmarPaymentsModule.forRoot()]);
     expect(payments.kbzPay().config.appId).toBe('from-process');
-    expect(payments.kbzPay().config.sandbox).toBe(false);
+    expect(payments.kbzPay().config.timeoutSeconds).toBe(12);
   });
 
   it('prefers explicit gateway options over the environment', async () => {
     const payments = await service([
       MyanmarPaymentsModule.forRoot({
         env: ENV,
-        kbzPay: { appId: 'explicit', appKey: 'key', merchantCode: 'code', sandbox: false },
+        kbzPay: { appId: 'explicit', appKey: 'key', merchantCode: 'code', timeoutSeconds: 10 },
         waveMoney: undefined,
       }),
     ]);
     expect(payments.kbzPay().config.appId).toBe('explicit');
-    expect(payments.kbzPay().config.sandbox).toBe(false);
+    expect(payments.kbzPay().config.timeoutSeconds).toBe(10);
     expect(payments.waveMoney().config.merchantId).toBe('testmerchantID');
   });
 
   it('accepts SDK config instances', async () => {
-    const config = new KbzPayConfig({ appId: 'instance', appKey: 'key', merchantCode: 'code' });
+    const config = new KbzPayConfig({
+      appId: 'instance',
+      appKey: 'key',
+      merchantCode: 'code',
+      timeoutSeconds: 30,
+    });
     const payments = await service([MyanmarPaymentsModule.forRoot({ kbzPay: config, env: {} })]);
     expect(payments.kbzPay().config).toBe(config);
   });
@@ -127,10 +135,59 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(fetch.calls).toHaveLength(1);
   });
 
+  it('names every missing or invalid required setting', async () => {
+    const without = (key: keyof typeof ENV): Record<string, string> =>
+      Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== key));
+    const missing = await service([
+      MyanmarPaymentsModule.forRoot({ env: without('MYANMAR_PAYMENTS_HTTP_TIMEOUT') }),
+    ]);
+    for (const [build, gateway] of [
+      [() => missing.kbzPay(), 'kbz_pay'],
+      [() => missing.waveMoney(), 'wave_money'],
+      [() => missing.ayaPay(), 'aya_pay'],
+      [() => missing.yomaMmqr(), 'yoma_mmqr'],
+    ] as const) {
+      expect(build).toThrow(`The ${gateway} configuration is missing [timeout_in_seconds].`);
+    }
+    expect(missing.cyberSource()).toBeInstanceOf(CyberSource);
+
+    const ttl = await service([
+      MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS') }),
+    ]);
+    expect(() => ttl.waveMoney()).toThrow(
+      'The wave_money configuration is missing [time_to_live_in_seconds].',
+    );
+    const version = await service([
+      MyanmarPaymentsModule.forRoot({ env: without('YOMA_MMQR_API_VERSION') }),
+    ]);
+    expect(() => version.yomaMmqr()).toThrow(
+      'The yoma_mmqr configuration is missing [api_version].',
+    );
+    const name = await service([
+      MyanmarPaymentsModule.forRoot({
+        env: { ...without('WAVE_MONEY_MERCHANT_NAME'), APP_NAME: 'Shop' },
+      }),
+    ]);
+    expect(() => name.waveMoney()).toThrow(
+      'The wave_money configuration is missing [merchant_name].',
+    );
+    const invalid = await service([
+      MyanmarPaymentsModule.forRoot({ env: { ...ENV, MYANMAR_PAYMENTS_HTTP_TIMEOUT: 'soon' } }),
+    ]);
+    expect(() => invalid.kbzPay()).toThrow(
+      'The kbz_pay configuration [timeout_in_seconds] must be a whole number greater than 0.',
+    );
+  });
+
   it.each([
-    [{ timeoutMs: 1500 }, {}, 1500],
     [{}, { MYANMAR_PAYMENTS_HTTP_TIMEOUT: '7' }, 7000],
-    [{}, { MYANMAR_PAYMENTS_HTTP_TIMEOUT: 'soon' }, 30000],
+    [
+      {
+        kbzPay: { appId: 'id', appKey: 'key', merchantCode: 'code', timeoutSeconds: 2 },
+      },
+      {},
+      2000,
+    ],
   ])('sets the timeout from %j and %j', async (options, env, expected) => {
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     const fetch = fakeFetch({ '/precreate': { Response: { result: 'SUCCESS', code: '0' } } });
@@ -199,7 +256,6 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
             load: [
               () => ({
                 ...ENV,
-                KBZ_PAY_SANDBOX: false,
                 MYANMAR_PAYMENTS_HTTP_TIMEOUT: 5,
                 KBZ_PAY_BASE_URL: { nested: true },
               }),
@@ -210,7 +266,7 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
         useFactory: (config: ConfigService) => ({ env: config }),
       }),
     ]);
-    expect(payments.kbzPay().config.sandbox).toBe(false);
+    expect(payments.kbzPay().config.timeoutSeconds).toBe(5);
     expect(payments.kbzPay().config.apiUrl).toBe(KbzPayConfig.PRODUCTION_API_URL);
   });
 
@@ -229,7 +285,10 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
       MyanmarPaymentsModule.forRootAsync({
         useFactory: async () => {
           await Promise.resolve();
-          return { env: {}, ayaPay: { appKey: 'async-key', appSecret: 'secret' } };
+          return {
+            env: {},
+            ayaPay: { appKey: 'async-key', appSecret: 'secret', timeoutSeconds: 30 },
+          };
         },
       }),
     ]);
@@ -302,6 +361,9 @@ describe('gateway injection', () => {
       orderId: 'ORD-1',
       amount: Amount.parse('10.50'),
       callbackUrl: 'https://shop.test/cb',
+      currency: 'MMK',
+      transactionType: 'sale',
+      locale: 'en-us',
     });
     expect(form.fields.length).toBeGreaterThan(0);
   });

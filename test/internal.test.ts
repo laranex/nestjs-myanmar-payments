@@ -22,6 +22,9 @@ describe('MyanmarPaymentsService outside the module', () => {
       orderId: 'ORD-1',
       amount: 1,
       callbackUrl: 'https://shop.test/cb',
+      currency: 'MMK',
+      transactionType: 'sale',
+      locale: 'en-us',
     });
     expect(payments.autoSubmitUrl(form)).toMatch(
       /^https:\/\/shop\.test\/myanmar-payments\/form\?payload=/,

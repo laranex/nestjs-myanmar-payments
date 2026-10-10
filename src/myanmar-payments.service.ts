@@ -21,7 +21,6 @@ import { ApplicationConfig } from '@nestjs/core';
 import {
   CACHE_MANAGER,
   DEFAULT_FORM_PATH,
-  DEFAULT_FORM_TTL_MINUTES,
   MYANMAR_PAYMENTS_FORM_ROUTE,
   MYANMAR_PAYMENTS_OPTIONS,
 } from './constants.js';
@@ -68,7 +67,6 @@ export class MyanmarPaymentsService {
     const gatewayOptions: MyanmarPaymentsOptions = {
       fetch: options.fetch,
       httpClient: options.httpClient,
-      timeoutMs: options.timeoutMs ?? envTimeoutMs(this.env),
       tokenCache: this.tokenCache,
     };
     const config: MyanmarPaymentsConfig = {};
@@ -141,7 +139,8 @@ export class MyanmarPaymentsService {
   /**
    * A link to the module's form route that posts `form` (AYA Pay, CyberSource) from the customer's
    * browser, so a handler can simply redirect to it. The form is encrypted with AES-256-GCM and
-   * the link expires after `formLink.ttlMinutes` (30 by default).
+   * the link expires after `formLink.ttlMinutes` (`MYANMAR_PAYMENTS_FORM_TTL_MINUTES`), which is
+   * required.
    */
   autoSubmitUrl(form: FormPayment): string {
     if (!this.formRoute.enabled) {
@@ -149,13 +148,10 @@ export class MyanmarPaymentsService {
         'The Myanmar payments form route is disabled (formRoute.enabled is false); serve form.toHtml() yourself.',
       );
     }
-    const ttlMinutes = this.options.formLink?.ttlMinutes ?? DEFAULT_FORM_TTL_MINUTES;
-    if (!Number.isFinite(ttlMinutes) || ttlMinutes <= 0) {
-      throw new RangeError(
-        `formLink.ttlMinutes must be a positive number of minutes, got ${String(ttlMinutes)}.`,
-      );
-    }
-    const payload = this.formCipher(true).seal(form, nowSeconds() + Math.round(ttlMinutes * 60));
+    const ttlMinutes = wholeMinutes(
+      this.options.formLink?.ttlMinutes ?? envValue(this.env, 'MYANMAR_PAYMENTS_FORM_TTL_MINUTES'),
+    );
+    const payload = this.formCipher(true).seal(form, nowSeconds() + ttlMinutes * 60);
     const baseUrl = (this.options.formLink?.baseUrl ?? envValue(this.env, 'APP_URL') ?? '').replace(
       /\/+$/,
       '',
@@ -199,9 +195,24 @@ export class MyanmarPaymentsService {
   }
 }
 
-function envTimeoutMs(env: EnvSource): number | undefined {
-  const value = envValue(env, 'MYANMAR_PAYMENTS_HTTP_TIMEOUT');
-  return value !== undefined && /^\d+$/.test(value) ? Number(value) * 1000 : undefined;
+/**
+ * The form link lifetime: a whole number of minutes greater than 0, or its text. Unset or blank
+ * throws the missing `ConfigurationError`; anything else throws the invalid one.
+ */
+function wholeMinutes(value: number | string | undefined): number {
+  if (value === undefined || (typeof value === 'string' && value.trim() === '')) {
+    throw new ConfigurationError('form_route', 'ttl_minutes');
+  }
+  const minutes =
+    typeof value === 'number'
+      ? value
+      : /^[+-]?\d+$/.test(value.trim())
+        ? Number.parseInt(value.trim(), 10)
+        : Number.NaN;
+  if (!Number.isSafeInteger(minutes) || minutes <= 0) {
+    throw new ConfigurationError('form_route', 'ttl_minutes', true);
+  }
+  return minutes;
 }
 
 function nowSeconds(): number {
