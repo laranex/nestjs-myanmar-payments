@@ -45,9 +45,10 @@ export async function callbackRequestFrom(
     return request;
   }
   if (isCallbackRequestLike(request)) {
-    // A CallbackRequest from the other module format (ESM or CommonJS copy of the SDK).
+    // A CallbackRequest from the other module format (ESM or CommonJS copy of the SDK). Its exact
+    // bytes are carried across, so `rawBody` stays what the gateway sent.
     return CallbackRequest.from({
-      body: request.body,
+      body: request.rawBody instanceof Uint8Array ? request.rawBody : request.body,
       headers: request.headers,
       query: request.query,
     });
@@ -113,7 +114,8 @@ export function isPaymentCallback(value: unknown): value is PaymentCallback {
 
 function isCallbackRequestLike(
   value: object,
-): value is Pick<CallbackRequest, 'body' | 'headers' | 'query'> {
+): value is Pick<CallbackRequest, 'body' | 'headers' | 'query'> &
+  Partial<Pick<CallbackRequest, 'rawBody'>> {
   const request = value as Partial<Record<keyof CallbackRequest, unknown>>;
   return (
     typeof request.body === 'string' &&

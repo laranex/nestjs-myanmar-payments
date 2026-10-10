@@ -57,6 +57,8 @@ Every gateway is reached through the injected `MyanmarPaymentsService`: `kbzPay(
 
 Pass an `Amount` (`Amount.kyat(10000)`, `Amount.parse('10000.50')`) or a whole number, never a float. Only KBZ Pay (up to 2 decimals) and CyberSource accept decimals. Invalid data throws `InvalidPaymentDataError`; read the messages from its `errors`.
 
+- Compare a gateway's amount by value with `amount.equals(callback.amount)`: `'01000'`, `'1000'` and `'1000.00'` equal `Amount.kyat(1000)`; text that is not plain digits never does.
+
 ### Start a payment
 
 ```ts

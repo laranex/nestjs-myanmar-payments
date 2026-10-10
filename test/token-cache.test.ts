@@ -35,7 +35,7 @@ describe('Yoma MMQR token cache', () => {
     expect(fetch.calls.filter((url) => url.endsWith('/token'))).toHaveLength(1);
 
     const cache = moduleRef.get<CacheManagerLike>(CACHE_MANAGER);
-    const key = 'node-myanmar-payments.yoma-mmqr.token.';
+    const key = 'myanmar-payments.yoma-mmqr.token.';
     // The SDK keys the token by base URL and client id; find it through the token cache API.
     expect(await payments.tokenCache.get('missing')).toBeUndefined();
     const set = vi.spyOn(cache, 'set');

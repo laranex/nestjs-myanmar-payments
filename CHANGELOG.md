@@ -16,4 +16,5 @@ Initial release. The version number matches the other Laranex Myanmar payments p
 - Agent skill in `skills/nestjs-myanmar-payments`; install it with `npx skills add laranex/nestjs-myanmar-payments`.
 
 ### Changed since the pre-releases
+- Requires `@laranex/myanmar-payments` `^4.0.0-dev.4`, which aligns its behavior with the PHP, Go and Python SDKs. Through it: `CallbackRequest.rawBody` holds the exact bytes received (`callbackRequestFrom()` keeps them when it copies a request from the other module format), JSON numbers in callbacks stay exact strings in `raw`, `Amount.equals()` ignores leading zeros, `sandbox` also takes a string, nested callback values fail verification, and Yoma MMQR tokens are cached under `myanmar-payments.yoma-mmqr.token.<sha256 of base URL and client id>`, the key every SDK shares.
 - Built on a `@laranex/myanmar-payments` version where `PaymentStatus.Cancelled` (`'cancelled'`) is renamed to `PaymentStatus.Canceled` (`'canceled'`); update code or stored statuses from the `v4.0.0-dev` pre-releases.
