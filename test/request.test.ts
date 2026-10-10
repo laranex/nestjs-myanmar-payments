@@ -26,6 +26,22 @@ describe('callbackRequestFrom', () => {
     const copy = await callbackRequestFrom(foreign as never);
     expect(copy).toBeInstanceOf(CallbackRequest);
     expect(copy).toMatchObject({ body: 'a=1', headers: { 'x-test': 'yes' }, query: { page: '2' } });
+    expect(copy.rawBody).toEqual(new TextEncoder().encode('a=1'));
+  });
+
+  it('keeps the exact bytes of a CallbackRequest from the other module format', async () => {
+    const bytes = new Uint8Array([0x61, 0x3d, 0xff]);
+    const original = CallbackRequest.from({ body: bytes });
+    const foreign = {
+      body: original.body,
+      rawBody: original.rawBody,
+      headers: original.headers,
+      query: original.query,
+      parsedBody: () => ({}),
+    };
+    const copy = await callbackRequestFrom(foreign as never);
+    expect(copy.rawBody).toEqual(bytes);
+    expect(copy.body).toBe(original.body);
   });
 
   it('prefers the raw body Nest keeps', async () => {
@@ -37,6 +53,7 @@ describe('callbackRequestFrom', () => {
       body: { amount: 1000.5 },
     });
     expect(request.body).toBe('{"amount":1000.50}');
+    expect(request.rawBody).toEqual(new TextEncoder().encode('{"amount":1000.50}'));
     expect(request.query).toEqual({ x: '1' });
   });
 
