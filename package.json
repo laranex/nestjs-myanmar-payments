@@ -1,6 +1,6 @@
 {
   "name": "@laranex/nestjs-myanmar-payments",
-  "version": "4.0.0-dev.4",
+  "version": "4.0.0-dev.6",
   "description": "NestJS integration for Myanmar payment gateways: KBZ Pay, Wave Money, AYA Pay, Yoma MMQR and CyberSource. Built on Node Myanmar Payments. Injectable module, verified callbacks and test fakes.",
   "keywords": [
     "laranex",
