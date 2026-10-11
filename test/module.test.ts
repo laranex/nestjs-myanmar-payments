@@ -170,8 +170,17 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     const ttl = await service([
       MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS') }),
     ]);
-    expect(() => ttl.waveMoney()).toThrow(
-      'The wave_money configuration is missing [time_to_live_in_seconds].',
+    expect(ttl.waveMoney().config.timeToLiveSeconds).toBeUndefined();
+    await expect(
+      ttl.waveMoney().initiate({
+        orderId: '100',
+        callbackUrl: 'https://shop.test/cb',
+        returnUrl: 'https://shop.test/done',
+        description: 'Order 100',
+        items: [{ name: 'Shoes', amount: 1000 }],
+      }),
+    ).rejects.toThrow(
+      'The timeToLiveSeconds field is required when the wave_money configuration has no [time_to_live_in_seconds].',
     );
     const version = await service([
       MyanmarPaymentsModule.forRoot({ env: without('YOMA_MMQR_API_VERSION') }),
@@ -200,7 +209,13 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     [{}, { MYANMAR_PAYMENTS_HTTP_TIMEOUT: '' }, 30000],
     [
       {
-        kbzPay: { appId: 'id', appKey: 'key', merchantCode: 'code', timeoutSeconds: 2 },
+        kbzPay: {
+          appId: 'id',
+          appKey: 'key',
+          merchantCode: 'code',
+          timeoutSeconds: 2,
+          timeToLiveMinutes: 30,
+        },
       },
       {},
       2000,

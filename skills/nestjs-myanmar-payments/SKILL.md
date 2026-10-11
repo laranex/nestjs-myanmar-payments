@@ -38,8 +38,9 @@ Gateway calls go through `fetch`, Yoma MMQR tokens through `@nestjs/cache-manage
 
 Set the env keys of the gateways you use. Every gateway defaults to its production URLs; to test against UAT, set the URL overrides (`KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `WAVE_MONEY_BASE_URL`, `WAVE_MONEY_AUTHENTICATE_URL`, `AYA_PAY_BASE_URL`, `YOMA_MMQR_BASE_URL`, `CYBER_SOURCE_BASE_URL`) to the gateway's UAT URLs. Every other setting is required, with no defaults, unless marked optional:
 
-- KBZ Pay: `KBZ_PAY_APP_ID`, `KBZ_PAY_APP_KEY`, `KBZ_PAY_MERCHANT_CODE`, optional `KBZ_PAY_TIME_TO_LIVE_IN_SECONDS` (a multiple of 60 from 60 to 7200; KBZ's 7200 when unset; a payment's `timeToLiveSeconds` overrides it)
-- Wave Money: `WAVE_MONEY_MERCHANT_ID`, `WAVE_MONEY_SECRET_KEY`, `WAVE_MONEY_MERCHANT_NAME`, `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS`
+- KBZ Pay: `KBZ_PAY_APP_ID`, `KBZ_PAY_APP_KEY`, `KBZ_PAY_MERCHANT_CODE`, optional `KBZ_PAY_TIME_TO_LIVE_IN_MINUTES` (1 to 120; a payment's `timeToLiveMinutes` overrides it)
+- Wave Money: `WAVE_MONEY_MERCHANT_ID`, `WAVE_MONEY_SECRET_KEY`, `WAVE_MONEY_MERCHANT_NAME`, optional `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS` (greater than 0; a payment's `timeToLiveSeconds` overrides it)
+- A payment must get a time to live from its own `timeToLiveMinutes` / `timeToLiveSeconds` or from the setting; with neither, `pwa()`, `qr()`, `app()` and Wave's `initiate()` throw `InvalidPaymentDataError` before any request.
 - AYA Pay: `AYA_PAY_APP_KEY`, `AYA_PAY_APP_SECRET` (`AYA_PGW_*` also read)
 - Yoma MMQR: `YOMA_MMQR_MERCHANT_ID`, `YOMA_MMQR_CLIENT_ID`, `YOMA_MMQR_CLIENT_SECRET`, `YOMA_MMQR_WEBHOOK_HASHKEY`, `YOMA_MMQR_API_VERSION` (e.g. `v1rc`), optional `YOMA_MMQR_WEBHOOK_SECRET`
 - CyberSource: `CYBER_SOURCE_PROFILE_ID`, `CYBER_SOURCE_ACCESS_KEY`, `CYBER_SOURCE_SECRET_KEY`
@@ -83,7 +84,7 @@ export class CheckoutController {
 }
 ```
 
-- `RedirectPayment` from `kbzPay().pwa()` and `waveMoney().initiate()`: redirect to `payment.url`. For Wave, store `data.merchantReferenceId` with the order. Pass `merchantName` or `timeToLiveSeconds` in Wave's payment data to override the configured `WAVE_MONEY_MERCHANT_NAME` or `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS` for that one payment (the settings stay required).
+- `RedirectPayment` from `kbzPay().pwa()` and `waveMoney().initiate()`: redirect to `payment.url`. For Wave, store `data.merchantReferenceId` with the order. Pass `merchantName` or `timeToLiveSeconds` in Wave's payment data to override the configured `WAVE_MONEY_MERCHANT_NAME` or `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS` for that one payment (the merchant name setting stays required).
 - `QrPayment` from `kbzPay().qr()` (encode `qrString`) and `yomaMmqr().initiate()` (`qrImage` as base64, `qrImageDataUri()`, `expiresAt`, `reference`). Renew an expired Yoma QR with `yomaMmqr().renewQr(orderId)`.
 - `AppPayment` from `kbzPay().app()`: return it as JSON to the mobile app.
 
