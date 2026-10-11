@@ -41,7 +41,7 @@ export interface MyanmarPaymentsModuleOptions extends MyanmarPaymentsConfig {
   /**
    * Sends gateway requests, with its own timeout; takes precedence over `fetch`. Without one,
    * each gateway uses the SDK's fetch client with its config's `timeoutSeconds`
-   * (`MYANMAR_PAYMENTS_HTTP_TIMEOUT` from the environment).
+   * (`MYANMAR_PAYMENTS_HTTP_TIMEOUT` from the environment, 30 seconds when unset or blank).
    */
   httpClient?: HttpClient | undefined;
   /** Keeps Yoma MMQR's access token. Defaults to Nest's cache manager when present, else memory. */

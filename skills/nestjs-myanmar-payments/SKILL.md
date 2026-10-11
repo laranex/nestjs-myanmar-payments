@@ -36,16 +36,16 @@ Gateway calls go through `fetch`, Yoma MMQR tokens through `@nestjs/cache-manage
 
 ## Configure
 
-Set the env keys of the gateways you use. Every gateway defaults to its production URLs; to test against UAT, set the URL overrides (`KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `WAVE_MONEY_BASE_URL`, `WAVE_MONEY_AUTHENTICATE_URL`, `AYA_PAY_BASE_URL`, `YOMA_MMQR_BASE_URL`, `CYBER_SOURCE_BASE_URL`) to the gateway's UAT URLs. Every other setting is required, with no defaults:
+Set the env keys of the gateways you use. Every gateway defaults to its production URLs; to test against UAT, set the URL overrides (`KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `WAVE_MONEY_BASE_URL`, `WAVE_MONEY_AUTHENTICATE_URL`, `AYA_PAY_BASE_URL`, `YOMA_MMQR_BASE_URL`, `CYBER_SOURCE_BASE_URL`) to the gateway's UAT URLs. Every other setting is required, with no defaults, unless marked optional:
 
 - KBZ Pay: `KBZ_PAY_APP_ID`, `KBZ_PAY_APP_KEY`, `KBZ_PAY_MERCHANT_CODE`
 - Wave Money: `WAVE_MONEY_MERCHANT_ID`, `WAVE_MONEY_SECRET_KEY`, `WAVE_MONEY_MERCHANT_NAME`, `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS`
 - AYA Pay: `AYA_PAY_APP_KEY`, `AYA_PAY_APP_SECRET` (`AYA_PGW_*` also read)
 - Yoma MMQR: `YOMA_MMQR_MERCHANT_ID`, `YOMA_MMQR_CLIENT_ID`, `YOMA_MMQR_CLIENT_SECRET`, `YOMA_MMQR_WEBHOOK_HASHKEY`, `YOMA_MMQR_API_VERSION` (e.g. `v1rc`), optional `YOMA_MMQR_WEBHOOK_SECRET`
 - CyberSource: `CYBER_SOURCE_PROFILE_ID`, `CYBER_SOURCE_ACCESS_KEY`, `CYBER_SOURCE_SECRET_KEY`
-- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret)
+- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret)
 
-Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `waveMoney`, `ayaPay`, `yomaMmqr`, `cyberSource`; these win over the environment and need every required setting, e.g. `{ appId, appKey, merchantCode, timeoutSeconds: 30 }`), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
+Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `waveMoney`, `ayaPay`, `yomaMmqr`, `cyberSource`; these win over the environment and need every required setting, e.g. `{ appId, appKey, merchantCode }`; `timeoutSeconds` is optional and defaults to 30), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
 
 A gateway with a missing setting throws the SDK's `ConfigurationError` naming the key when first used, not at startup; a time setting that is not a whole number greater than 0 throws it too.
 

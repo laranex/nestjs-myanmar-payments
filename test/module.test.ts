@@ -3,6 +3,7 @@ import {
   AyaPay,
   ConfigurationError,
   CyberSource,
+  DEFAULT_TIMEOUT_SECONDS,
   KbzPay,
   KbzPayConfig,
   MemoryTokenCache,
@@ -135,21 +136,36 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(fetch.calls).toHaveLength(1);
   });
 
+  it('defaults the HTTP timeout to 30 seconds when it is unset or blank', async () => {
+    const without = (key: keyof typeof ENV): Record<string, string> =>
+      Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== key));
+    for (const env of [
+      without('MYANMAR_PAYMENTS_HTTP_TIMEOUT'),
+      { ...ENV, MYANMAR_PAYMENTS_HTTP_TIMEOUT: '   ' },
+    ]) {
+      const payments = await service([MyanmarPaymentsModule.forRoot({ env })]);
+      for (const config of [
+        payments.kbzPay().config,
+        payments.waveMoney().config,
+        payments.ayaPay().config,
+        payments.yomaMmqr().config,
+      ]) {
+        expect(config.timeoutSeconds).toBe(DEFAULT_TIMEOUT_SECONDS);
+      }
+      expect(payments.cyberSource()).toBeInstanceOf(CyberSource);
+    }
+    const explicit = await service([
+      MyanmarPaymentsModule.forRoot({
+        env: {},
+        kbzPay: { appId: 'id', appKey: 'key', merchantCode: 'code' },
+      }),
+    ]);
+    expect(explicit.kbzPay().config.timeoutSeconds).toBe(30);
+  });
+
   it('names every missing or invalid required setting', async () => {
     const without = (key: keyof typeof ENV): Record<string, string> =>
       Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== key));
-    const missing = await service([
-      MyanmarPaymentsModule.forRoot({ env: without('MYANMAR_PAYMENTS_HTTP_TIMEOUT') }),
-    ]);
-    for (const [build, gateway] of [
-      [() => missing.kbzPay(), 'kbz_pay'],
-      [() => missing.waveMoney(), 'wave_money'],
-      [() => missing.ayaPay(), 'aya_pay'],
-      [() => missing.yomaMmqr(), 'yoma_mmqr'],
-    ] as const) {
-      expect(build).toThrow(`The ${gateway} configuration is missing [timeout_in_seconds].`);
-    }
-    expect(missing.cyberSource()).toBeInstanceOf(CyberSource);
 
     const ttl = await service([
       MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS') }),
@@ -181,6 +197,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
 
   it.each([
     [{}, { MYANMAR_PAYMENTS_HTTP_TIMEOUT: '7' }, 7000],
+    [{}, { MYANMAR_PAYMENTS_HTTP_TIMEOUT: '' }, 30000],
     [
       {
         kbzPay: { appId: 'id', appKey: 'key', merchantCode: 'code', timeoutSeconds: 2 },
