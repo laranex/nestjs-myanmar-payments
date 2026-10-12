@@ -3,6 +3,9 @@ import { createCipheriv, hkdfSync, randomBytes } from 'node:crypto';
 import { Amount, ConfigurationError, FormPayment } from '@laranex/myanmar-payments';
 import {
   Injectable,
+  Module,
+  type MiddlewareConsumer,
+  type NestModule,
   type CanActivate,
   type ExecutionContext,
   type INestApplication,
@@ -12,6 +15,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 
 import { DEFAULT_FORM_PATH, MyanmarPaymentsModule, MyanmarPaymentsService } from '../src/index.js';
 import { FormLinkCipher } from '../src/form-link.js';
+import { defaultNonce } from '../src/form-payment.controller.js';
 import { ADAPTERS, createApp, ENV } from './helpers.js';
 
 const form = new FormPayment({
@@ -51,6 +55,7 @@ describe.each(ADAPTERS)('form route on %s', (adapter) => {
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/^text\/html/);
     expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['referrer-policy']).toBe('strict-origin');
     expect(response.text).toBe(form.toHtml());
     expect(response.text).toContain('action="https://testsecureacceptance.cybersource.com/pay"');
   });
@@ -200,6 +205,104 @@ describe('form route options', () => {
     }
   });
 
+  it.each<[string, Record<string, string>, Record<string, unknown>]>([
+    ['formLink.secret', {}, { secret: 'x'.repeat(31) }],
+    ['formLink.secret', {}, { secret: new Uint8Array(31) }],
+    ['MYANMAR_PAYMENTS_FORM_KEY', { MYANMAR_PAYMENTS_FORM_KEY: 'short' }, {}],
+    ['MYANMAR_PAYMENTS_FORM_KEY', { MYANMAR_PAYMENTS_FORM_KEY: `base64:${'A'.repeat(40)}` }, {}],
+    ['APP_KEY', { APP_KEY: 'base64:c2hvcnQ=' }, {}],
+  ])('rejects a %s shorter than 32 bytes', async (key, env, formLink) => {
+    const app = await createApp({
+      adapter: 'express',
+      imports: [
+        MyanmarPaymentsModule.forRoot({
+          env: { MYANMAR_PAYMENTS_FORM_TTL_MINUTES: '30', ...env },
+          formLink,
+        }),
+      ],
+    });
+    try {
+      const payments = app.get(MyanmarPaymentsService);
+      const message = `The myanmar_payments configuration [${key}] must be at least 32 bytes, e.g. base64: followed by 32 random bytes in base64.`;
+      expect(() => payments.autoSubmitUrl(form)).toThrow(message);
+      expect(() => payments.resolveFormPayment('anything')).toThrow(ConfigurationError);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('accepts a secret of exactly 32 bytes', () => {
+    expect(new FormLinkCipher('x'.repeat(32), 'APP_KEY')).toBeInstanceOf(FormLinkCipher);
+    expect(() => new FormLinkCipher('x'.repeat(31))).toThrow(
+      new ConfigurationError(
+        'myanmar_payments',
+        'formLink.secret',
+        true,
+        'at least 32 bytes, e.g. base64: followed by 32 random bytes in base64',
+      ),
+    );
+  });
+
+  it.each(ADAPTERS)('adds the nonce of formRoute.nonce on %s', async (adapter) => {
+    const seen: unknown[] = [];
+    const app = await createApp({
+      adapter,
+      imports: [
+        MyanmarPaymentsModule.forRoot({
+          env: ENV,
+          formRoute: {
+            nonce: (req, res) => {
+              seen.push(req, res);
+              return 'n"1';
+            },
+          },
+        }),
+      ],
+    });
+    try {
+      const url = app.get(MyanmarPaymentsService).autoSubmitUrl(form);
+      const response = await request(app.getHttpServer()).get(url.replace('https://shop.test', ''));
+      expect(response.text).toBe(form.toHtml().replace('<script>', '<script nonce="n&#34;1">'));
+      expect(seen).toHaveLength(2);
+      expect(seen.every((value) => typeof value === 'object' && value !== null)).toBe(true);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("reads helmet's nonce by default", () => {
+    expect(defaultNonce({}, { locals: { cspNonce: 'express' } })).toBe('express');
+    expect(defaultNonce({}, { cspNonce: { script: 'fastify', style: 's' } })).toBe('fastify');
+    for (const response of [null, undefined, {}, { locals: {} }, { locals: { cspNonce: 1 } }]) {
+      expect(defaultNonce({}, response)).toBeUndefined();
+    }
+  });
+
+  it("serves helmet's res.locals.cspNonce by default on express", async () => {
+    @Module({})
+    class NonceModule implements NestModule {
+      configure(consumer: MiddlewareConsumer): void {
+        consumer
+          .apply((_req: unknown, res: { locals: Record<string, unknown> }, next: () => void) => {
+            res.locals.cspNonce = 'helmet-nonce';
+            next();
+          })
+          .forRoutes('*');
+      }
+    }
+    const app = await createApp({
+      adapter: 'express',
+      imports: [NonceModule, MyanmarPaymentsModule.forRoot({ env: ENV })],
+    });
+    try {
+      const url = app.get(MyanmarPaymentsService).autoSubmitUrl(form);
+      const response = await request(app.getHttpServer()).get(url.replace('https://shop.test', ''));
+      expect(response.text).toContain('<script nonce="helmet-nonce">');
+    } finally {
+      await app.close();
+    }
+  });
+
   it.each([0, -5, 1.5, Number.NaN, Number.POSITIVE_INFINITY, 'five', '0', '1.5'])(
     'rejects a ttlMinutes of %s',
     async (ttlMinutes) => {
@@ -301,7 +404,8 @@ describe('form route options', () => {
 });
 
 describe('FormLinkCipher', () => {
-  const cipher = new FormLinkCipher('secret');
+  const secret = 's'.repeat(32);
+  const cipher = new FormLinkCipher(secret);
   const now = 1_000_000;
 
   it('opens what it sealed until it expires', () => {
@@ -312,7 +416,9 @@ describe('FormLinkCipher', () => {
   });
 
   it('rejects tokens sealed with another secret', () => {
-    expect(new FormLinkCipher('other').open(cipher.seal(form, now + 10), now)).toBeUndefined();
+    expect(
+      new FormLinkCipher('o'.repeat(32)).open(cipher.seal(form, now + 10), now),
+    ).toBeUndefined();
   });
 
   /** Encrypts arbitrary JSON the way the cipher does, to test what it accepts. */
@@ -320,7 +426,7 @@ describe('FormLinkCipher', () => {
     const key = Buffer.from(
       hkdfSync(
         'sha256',
-        Buffer.from('secret'),
+        Buffer.from(secret),
         Buffer.alloc(0),
         'laranex/nestjs-myanmar-payments form link v1',
         32,

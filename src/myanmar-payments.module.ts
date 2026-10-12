@@ -42,12 +42,13 @@ const { ConfigurableModuleClass, OPTIONS_TYPE, ASYNC_OPTIONS_TYPE } =
           enabled: extras.formRoute?.enabled ?? true,
           path: extras.formRoute?.path ?? DEFAULT_FORM_PATH,
           guards: extras.formRoute?.guards ?? [],
+          nonce: extras.formRoute?.nonce,
         };
         return {
           ...definition,
           global: extras.isGlobal === true,
           controllers: formRoute.enabled
-            ? [formPaymentController(formRoute.path, formRoute.guards)]
+            ? [formPaymentController(formRoute.path, formRoute.guards, formRoute.nonce)]
             : [],
           providers: [
             // forRoot() and forRootAsync() always fill in the options providers.

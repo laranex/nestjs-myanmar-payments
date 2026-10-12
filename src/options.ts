@@ -63,7 +63,16 @@ export interface FormRouteOptions {
    * authentication: the customer may arrive from a gateway or another device.
    */
   guards?: (CanActivate | Type<CanActivate>)[] | undefined;
+  /**
+   * Returns the Content Security Policy nonce for the page's inline script, from the request and
+   * response Nest passes to the route. Defaults to `res.locals.cspNonce` (Express, the usual
+   * helmet setup) or `reply.cspNonce.script` (`@fastify/helmet`) when one is set.
+   */
+  nonce?: FormNonceResolver | undefined;
 }
+
+/** Reads a CSP nonce for the form page from the route's request and response. */
+export type FormNonceResolver = (request: unknown, response: unknown) => string | undefined;
 
 /** Options given to `forRoot()` / `forRootAsync()` directly, never through a factory. */
 export interface MyanmarPaymentsModuleExtras {
@@ -78,4 +87,5 @@ export interface ResolvedFormRoute {
   enabled: boolean;
   path: string;
   guards: (CanActivate | Type<CanActivate>)[];
+  nonce?: FormNonceResolver | undefined;
 }
