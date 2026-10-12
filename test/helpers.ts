@@ -35,7 +35,7 @@ export const ENV = {
   CYBER_SOURCE_PROFILE_ID: 'profile',
   CYBER_SOURCE_ACCESS_KEY: 'access',
   CYBER_SOURCE_SECRET_KEY: 'cs-secret',
-  MYANMAR_PAYMENTS_FORM_KEY: 'form-secret',
+  MYANMAR_PAYMENTS_FORM_KEY: 'form-secret-of-at-least-32-bytes',
 } as const;
 
 export interface AppOptions {

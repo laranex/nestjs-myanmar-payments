@@ -1,10 +1,13 @@
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
 
-import { FormPayment } from '@laranex/myanmar-payments';
+import { ConfigurationError, FormPayment } from '@laranex/myanmar-payments';
 
 const INFO = 'laranex/nestjs-myanmar-payments form link v1';
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
+
+/** The shortest secret a form link is encrypted with, in bytes (after `base64:` decoding). */
+export const MIN_SECRET_BYTES = 32;
 
 interface SealedForm {
   o: string;
@@ -23,8 +26,20 @@ interface SealedForm {
 export class FormLinkCipher {
   private readonly key: Buffer;
 
-  constructor(secret: string | Uint8Array) {
+  /**
+   * @param key The setting the secret came from, named in the error when it is shorter than
+   *   {@link MIN_SECRET_BYTES}.
+   */
+  constructor(secret: string | Uint8Array, key = 'formLink.secret') {
     const material = typeof secret === 'string' ? decodeSecret(secret) : Buffer.from(secret);
+    if (material.length < MIN_SECRET_BYTES) {
+      throw new ConfigurationError(
+        'myanmar_payments',
+        key,
+        true,
+        `at least ${MIN_SECRET_BYTES} bytes, e.g. base64: followed by 32 random bytes in base64`,
+      );
+    }
     this.key = Buffer.from(hkdfSync('sha256', material, Buffer.alloc(0), INFO, 32));
   }
 

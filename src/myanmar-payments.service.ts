@@ -179,17 +179,19 @@ export class MyanmarPaymentsService {
   private formCipher(required: false): FormLinkCipher | undefined;
   private formCipher(required: boolean): FormLinkCipher | undefined {
     if (this.cipher === undefined) {
-      const secret =
-        this.options.formLink?.secret ??
-        envValue(this.env, 'MYANMAR_PAYMENTS_FORM_KEY') ??
-        envValue(this.env, 'APP_KEY');
+      const sources: [string, string | Uint8Array | undefined][] = [
+        ['formLink.secret', this.options.formLink?.secret],
+        ['MYANMAR_PAYMENTS_FORM_KEY', envValue(this.env, 'MYANMAR_PAYMENTS_FORM_KEY')],
+        ['APP_KEY', envValue(this.env, 'APP_KEY')],
+      ];
+      const [key, secret] = sources.find(([, value]) => value !== undefined) ?? ['', undefined];
       if (secret === undefined || secret.length === 0) {
         if (required) {
           throw new ConfigurationError('myanmar_payments', 'formLink.secret');
         }
         return undefined;
       }
-      this.cipher = new FormLinkCipher(secret);
+      this.cipher = new FormLinkCipher(secret, key);
     }
     return this.cipher;
   }
