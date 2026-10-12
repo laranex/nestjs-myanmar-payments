@@ -204,3 +204,23 @@ describe('callbacks with an unconfigured gateway', () => {
     }
   });
 });
+
+describe.each(ADAPTERS)('an oversized callback on %s', (adapter) => {
+  it.each([true, false])('answers 413 with rawBody: %s', async (rawBody) => {
+    const app = await createApp({
+      adapter,
+      rawBody,
+      imports: [MyanmarPaymentsModule.forRoot({ env: ENV })],
+      controllers: [CallbackController],
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .post('/payments/callback/kbz-pay')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify({ Request: { note: 'a'.repeat(70 * 1024) } }));
+      expect(response.status).toBe(413);
+    } finally {
+      await app.close();
+    }
+  });
+});

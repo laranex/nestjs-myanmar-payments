@@ -1,9 +1,68 @@
 import { Readable } from 'node:stream';
 
-import { Acknowledgement, CallbackRequest } from '@laranex/myanmar-payments';
-import { describe, expect, it } from 'vitest';
+import { Acknowledgement, CallbackRequest, PaymentError } from '@laranex/myanmar-payments';
+import { PayloadTooLargeException } from '@nestjs/common';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { acknowledge, callbackRequestFrom, type FastifyReplyLike } from '../src/index.js';
+import { MAX_CALLBACK_BODY_BYTES } from '../src/request.js';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('callbackRequestFrom body limit', () => {
+  const tooLarge = `The callback request body is larger than ${MAX_CALLBACK_BODY_BYTES} bytes.`;
+  const big = 'a'.repeat(MAX_CALLBACK_BODY_BYTES + 1);
+
+  it('is 64 KiB and accepts a body of exactly that size', async () => {
+    expect(MAX_CALLBACK_BODY_BYTES).toBe(65536);
+    const exact = await callbackRequestFrom({ headers: {}, rawBody: big.slice(1) });
+    expect(exact.rawBody.length).toBe(MAX_CALLBACK_BODY_BYTES);
+  });
+
+  it('rejects an oversized raw body, declared length and parsed body with 413', async () => {
+    for (const request of [
+      { headers: {}, rawBody: Buffer.from(big) },
+      { headers: { 'content-length': String(MAX_CALLBACK_BODY_BYTES + 1) }, body: {} },
+      { headers: { 'content-type': 'application/json' }, body: { note: big } },
+    ]) {
+      const error = await callbackRequestFrom(request).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(PayloadTooLargeException);
+      expect((error as Error).message).toBe(tooLarge);
+    }
+  });
+
+  it('stops reading a stream once it passes the limit', async () => {
+    let pulled = 0;
+    const stream = Object.assign(
+      Readable.from(
+        (function* () {
+          for (;;) {
+            pulled++;
+            yield pulled % 2 === 0 ? 'a'.repeat(16 * 1024) : Buffer.alloc(16 * 1024);
+          }
+        })(),
+      ),
+      { headers: {}, url: '/' },
+    );
+    await expect(callbackRequestFrom(stream)).rejects.toThrow(PayloadTooLargeException);
+    expect(pulled).toBeLessThan(10);
+  });
+
+  it("maps a newer SDK's own size error to 413 and passes other errors through", async () => {
+    const spy = vi.spyOn(CallbackRequest, 'fromNodeRequest');
+    spy.mockRejectedValueOnce(
+      new PaymentError('The callback request body is larger than 1 bytes.'),
+    );
+    await expect(callbackRequestFrom({ headers: {}, body: {} })).rejects.toThrow(
+      PayloadTooLargeException,
+    );
+    const failure = new Error('stream failed');
+    spy.mockRejectedValueOnce(failure);
+    await expect(callbackRequestFrom({ headers: {}, body: {} })).rejects.toBe(failure);
+  });
+});
 
 describe('callbackRequestFrom', () => {
   it('returns a CallbackRequest unchanged', async () => {
