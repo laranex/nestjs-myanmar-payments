@@ -44,9 +44,9 @@ Set the env keys of the gateways you use. Every gateway defaults to its producti
 - AYA Pay: `AYA_PAY_APP_KEY`, `AYA_PAY_APP_SECRET` (`AYA_PGW_*` also read)
 - Yoma MMQR: `YOMA_MMQR_MERCHANT_ID`, `YOMA_MMQR_CLIENT_ID`, `YOMA_MMQR_CLIENT_SECRET`, `YOMA_MMQR_WEBHOOK_HASHKEY`, `YOMA_MMQR_API_VERSION` (e.g. `v1rc`), optional `YOMA_MMQR_WEBHOOK_SECRET`
 - CyberSource: `CYBER_SOURCE_PROFILE_ID`, `CYBER_SOURCE_ACCESS_KEY`, `CYBER_SOURCE_SECRET_KEY`
-- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret)
+- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret, at least 32 bytes, e.g. `base64:` followed by 32 random bytes in base64)
 
-Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `waveMoney`, `ayaPay`, `yomaMmqr`, `cyberSource`; these win over the environment and need every required setting, e.g. `{ appId, appKey, merchantCode }`; `timeoutSeconds` is optional and defaults to 30), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
+Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `waveMoney`, `ayaPay`, `yomaMmqr`, `cyberSource`; these win over the environment and need every required setting, e.g. `{ appId, appKey, merchantCode }`; `timeoutSeconds` is optional and defaults to 30), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`, `nonce`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
 
 A gateway with a missing setting throws the SDK's `ConfigurationError` naming the key when first used, not at startup; a time setting that is not a whole number greater than 0 throws it too.
 
@@ -106,13 +106,13 @@ const payment = this.payments.ayaPay().initiate({
 return { url: this.payments.autoSubmitUrl(payment) };
 ```
 
-`autoSubmitUrl()` throws when `formRoute.enabled` is `false`, and a `ConfigurationError` without a secret or a lifetime.
+`autoSubmitUrl()` throws when `formRoute.enabled` is `false`, and a `ConfigurationError` without a secret or a lifetime, or with a secret shorter than 32 bytes (the error names the setting). The form page sends only its origin as the referrer; under a Content Security Policy its inline script takes helmet's nonce (`res.locals.cspNonce` on Express, `reply.cspNonce.script` on Fastify) or the one `formRoute.nonce: (req, res) => string` returns.
 
 CyberSource has no payment defaults: pass `currency` (e.g. `'MMK'`), `transactionType` (e.g. `CyberSourceTransactionType.Sale`) and `locale` (e.g. `'en-us'`) on every `cyberSource().initiate(data)`.
 
 ### Handle the callback
 
-Register a POST route without authentication guards. `@VerifiedCallback()` verifies the signature and injects a `PaymentCallback`; a bad signature answers 400 before the handler runs:
+Register a POST route without authentication guards. `@VerifiedCallback()` verifies the signature and injects a `PaymentCallback`; a bad signature answers 400 before the handler runs, and a body over 64 KiB answers 413:
 
 ```ts
 import { PaymentCallback } from '@laranex/myanmar-payments';
