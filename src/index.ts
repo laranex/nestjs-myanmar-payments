@@ -5,6 +5,7 @@ export {
   RawCallback,
   VerifiedCallback,
   VerifiedCallbackPipe,
+  type CallbackRequestReader,
 } from './callback.js';
 export {
   AYA_PAY,

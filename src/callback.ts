@@ -26,9 +26,14 @@ import type { GatewayName } from './gateways.js';
 import { MyanmarPaymentsService } from './myanmar-payments.service.js';
 import { callbackRequestFrom, isPaymentCallback, type NestRequestLike } from './request.js';
 
+/** Reads the request's body when called, so the pipes decide when (and whether) it is read. */
+export type CallbackRequestReader = () => Promise<CallbackRequest>;
+
 const callbackRequestParam = createParamDecorator(
-  (_gateway: unknown, context: ExecutionContext): Promise<CallbackRequest> =>
-    callbackRequestFrom(context.switchToHttp().getRequest<NestRequestLike>()),
+  (_gateway: unknown, context: ExecutionContext): CallbackRequestReader => {
+    const request = context.switchToHttp().getRequest<NestRequestLike>();
+    return () => callbackRequestFrom(request);
+  },
 );
 
 /**
@@ -39,17 +44,14 @@ export function RawCallback(): ParameterDecorator {
   return callbackRequestParam(undefined, CallbackRequestPipe);
 }
 
-/**
- * Resolves the `CallbackRequest` of {@link RawCallback}: reading the body is asynchronous, and Nest
- * does not await custom parameter factories itself.
- */
+/** Reads the `CallbackRequest` of {@link RawCallback}: reading the body is asynchronous. */
 @Injectable()
 export class CallbackRequestPipe implements PipeTransform<
-  Promise<CallbackRequest>,
+  CallbackRequestReader,
   Promise<CallbackRequest>
 > {
-  transform(value: Promise<CallbackRequest>): Promise<CallbackRequest> {
-    return Promise.resolve(value);
+  transform(read: CallbackRequestReader): Promise<CallbackRequest> {
+    return read();
   }
 }
 
@@ -70,22 +72,20 @@ export function VerifiedCallback(gateway: GatewayName): ParameterDecorator {
 /** Verifies the `CallbackRequest` of {@link VerifiedCallback} with the gateway in its data. */
 @Injectable()
 export class VerifiedCallbackPipe implements PipeTransform<
-  Promise<CallbackRequest> | CallbackRequest,
+  CallbackRequestReader,
   Promise<PaymentCallback>
 > {
   constructor(@Inject(MyanmarPaymentsService) private readonly payments: MyanmarPaymentsService) {}
 
   async transform(
-    value: Promise<CallbackRequest> | CallbackRequest,
+    read: CallbackRequestReader,
     metadata: ArgumentMetadata,
   ): Promise<PaymentCallback> {
-    // Resolve the gateway (unknown name, missing settings) before the body errors, like
-    // handleCallback() and the other framework packages; the body read keeps running meanwhile.
-    const request = Promise.resolve(value);
-    request.catch(() => undefined);
     try {
+      // Resolve the gateway (unknown name, missing settings) before reading the body, like
+      // handleCallback() and the other framework packages.
       this.payments.gateway(metadata.data as GatewayName);
-      return await this.payments.handleCallback(metadata.data as GatewayName, await request);
+      return await this.payments.handleCallback(metadata.data as GatewayName, await read());
     } catch (error) {
       if (error instanceof SignatureVerificationError) {
         throw new BadRequestException(error.message);
