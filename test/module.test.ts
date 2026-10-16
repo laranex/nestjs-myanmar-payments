@@ -32,6 +32,12 @@ import {
 } from '../src/index.js';
 import { ENV, fakeFetch } from './helpers.js';
 
+const KBZ_URLS = {
+  apiUrl: ENV.KBZ_PAY_BASE_URL,
+  pwaUrl: ENV.KBZ_PAY_PWA_BASE_REDIRECT_URL,
+  timeToLiveMinutes: 30,
+};
+
 async function service(
   module: Parameters<typeof Test.createTestingModule>[0]['imports'],
 ): Promise<MyanmarPaymentsService> {
@@ -70,6 +76,9 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     vi.stubEnv('KBZ_PAY_APP_ID', 'from-process');
     vi.stubEnv('KBZ_PAY_APP_KEY', 'key');
     vi.stubEnv('KBZ_PAY_MERCHANT_CODE', 'code');
+    vi.stubEnv('KBZ_PAY_BASE_URL', ENV.KBZ_PAY_BASE_URL);
+    vi.stubEnv('KBZ_PAY_PWA_BASE_REDIRECT_URL', ENV.KBZ_PAY_PWA_BASE_REDIRECT_URL);
+    vi.stubEnv('KBZ_PAY_TIME_TO_LIVE_IN_MINUTES', '30');
     vi.stubEnv('MYANMAR_PAYMENTS_HTTP_TIMEOUT', '12');
     const payments = await service([MyanmarPaymentsModule.forRoot()]);
     expect(payments.kbzPay().config.appId).toBe('from-process');
@@ -80,7 +89,13 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     const payments = await service([
       MyanmarPaymentsModule.forRoot({
         env: ENV,
-        kbzPay: { appId: 'explicit', appKey: 'key', merchantCode: 'code', timeoutSeconds: 10 },
+        kbzPay: {
+          ...KBZ_URLS,
+          appId: 'explicit',
+          appKey: 'key',
+          merchantCode: 'code',
+          timeoutSeconds: 10,
+        },
         waveMoney: undefined,
       }),
     ]);
@@ -95,6 +110,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       appKey: 'key',
       merchantCode: 'code',
       timeoutSeconds: 30,
+      ...KBZ_URLS,
     });
     const payments = await service([MyanmarPaymentsModule.forRoot({ kbzPay: config, env: {} })]);
     expect(payments.kbzPay().config).toBe(config);
@@ -157,7 +173,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     const explicit = await service([
       MyanmarPaymentsModule.forRoot({
         env: {},
-        kbzPay: { appId: 'id', appKey: 'key', merchantCode: 'code' },
+        kbzPay: { ...KBZ_URLS, appId: 'id', appKey: 'key', merchantCode: 'code' },
       }),
     ]);
     expect(explicit.kbzPay().config.timeoutSeconds).toBe(30);
@@ -170,17 +186,20 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     const ttl = await service([
       MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS') }),
     ]);
-    expect(ttl.waveMoney().config.timeToLiveSeconds).toBeUndefined();
-    await expect(
-      ttl.waveMoney().initiate({
-        orderId: '100',
-        callbackUrl: 'https://shop.test/cb',
-        returnUrl: 'https://shop.test/done',
-        description: 'Order 100',
-        items: [{ name: 'Shoes', amount: 1000 }],
-      }),
-    ).rejects.toThrow(
-      'The timeToLiveSeconds field is required when the wave_money configuration has no [time_to_live_in_seconds].',
+    expect(() => ttl.waveMoney()).toThrow(
+      'The wave_money configuration is missing [time_to_live_in_seconds].',
+    );
+    const redirect = await service([
+      MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_BASE_REDIRECT_URL') }),
+    ]);
+    expect(() => redirect.waveMoney()).toThrow(
+      'The wave_money configuration is missing [base_redirect_url].',
+    );
+    const secret = await service([
+      MyanmarPaymentsModule.forRoot({ env: without('YOMA_MMQR_WEBHOOK_SECRET') }),
+    ]);
+    expect(() => secret.yomaMmqr()).toThrow(
+      'The yoma_mmqr configuration is missing [webhook_secret].',
     );
     const version = await service([
       MyanmarPaymentsModule.forRoot({ env: without('YOMA_MMQR_API_VERSION') }),
@@ -215,6 +234,8 @@ describe('MyanmarPaymentsModule.forRoot', () => {
           merchantCode: 'code',
           timeoutSeconds: 2,
           timeToLiveMinutes: 30,
+          apiUrl: ENV.KBZ_PAY_BASE_URL,
+          pwaUrl: ENV.KBZ_PAY_PWA_BASE_REDIRECT_URL,
         },
       },
       {},
@@ -298,8 +319,8 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
         useFactory: (config: ConfigService) => ({ env: config }),
       }),
     ]);
-    expect(payments.kbzPay().config.timeoutSeconds).toBe(5);
-    expect(payments.kbzPay().config.apiUrl).toBe(KbzPayConfig.PRODUCTION_API_URL);
+    expect(payments.yomaMmqr().config.timeoutSeconds).toBe(5);
+    expect(() => payments.kbzPay()).toThrow('The kbz_pay configuration is missing [api_url].');
   });
 
   it('lets tests override the options', async () => {
@@ -319,7 +340,12 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
           await Promise.resolve();
           return {
             env: {},
-            ayaPay: { appKey: 'async-key', appSecret: 'secret', timeoutSeconds: 30 },
+            ayaPay: {
+              appKey: 'async-key',
+              appSecret: 'secret',
+              timeoutSeconds: 30,
+              baseUrl: ENV.AYA_PAY_BASE_URL,
+            },
           };
         },
       }),
@@ -331,7 +357,15 @@ describe('MyanmarPaymentsModule.forRootAsync', () => {
     @Injectable()
     class PaymentsConfig implements MyanmarPaymentsOptionsFactory {
       createMyanmarPaymentsOptions(): MyanmarPaymentsModuleOptions {
-        return { env: ENV, cyberSource: { profileId: 'p', accessKey: 'a', secretKey: 's' } };
+        return {
+          env: ENV,
+          cyberSource: {
+            profileId: 'p',
+            accessKey: 'a',
+            secretKey: 's',
+            baseUrl: ENV.CYBER_SOURCE_BASE_URL,
+          },
+        };
       }
     }
     const payments = await service([

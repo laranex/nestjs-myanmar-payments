@@ -128,6 +128,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       const response = await request(app.getHttpServer())
         .post(`/payments/callback/${gateway}`)
         .set('Content-Type', signed.contentType)
+        .set(signed.headers)
         .send(signed.body);
 
       expect(response.status).toBe(200);
@@ -144,6 +145,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       const response = await request(app.getHttpServer())
         .post(`/payments/callback/${gateway}`)
         .set('Content-Type', signed.contentType)
+        .set(signed.headers)
         .send(signed.body);
 
       expect(response.status).toBe(400);
@@ -152,11 +154,28 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       expect(received).toHaveLength(0);
     });
 
+    it.each(['', 'wrong-secret'])(
+      'answers 400 to a yoma-mmqr callback with the webhook secret %j',
+      async (secret) => {
+        const signed = callbacks['yoma-mmqr']();
+        received.length = 0;
+        const response = await request(app.getHttpServer())
+          .post('/payments/callback/yoma-mmqr')
+          .set('Content-Type', signed.contentType)
+          .set(secret === '' ? {} : { 'X-Webhook-Secret': secret })
+          .send(signed.body);
+
+        expect(response.status).toBe(400);
+        expect(received).toHaveLength(0);
+      },
+    );
+
     it.each(GATEWAY_NAMES)('acknowledges a %s callback through @Res()', async (gateway) => {
       const signed = callbacks[gateway]();
       const response = await request(app.getHttpServer())
         .post(`/payments/callback/manual/${gateway}`)
         .set('Content-Type', signed.contentType)
+        .set(signed.headers)
         .send(signed.body);
       expect(response.status).toBe(200);
       expect(response.text).toBe(signed.acknowledgement);
@@ -165,6 +184,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       const rejected = await request(app.getHttpServer())
         .post(`/payments/callback/manual/${gateway}`)
         .set('Content-Type', tampered.contentType)
+        .set(tampered.headers)
         .send(tampered.body);
       expect(rejected.status).toBe(400);
       expect(rejected.text).toBe('invalid signature');
@@ -197,6 +217,7 @@ describe('callbacks with an unconfigured gateway', () => {
       const response = await request(app.getHttpServer())
         .post('/payments/callback/kbz-pay')
         .set('Content-Type', signed.contentType)
+        .set(signed.headers)
         .send(signed.body);
       expect(response.status).toBe(500);
     } finally {

@@ -21,20 +21,28 @@ export const ENV = {
   KBZ_PAY_TIME_TO_LIVE_IN_MINUTES: '30',
   KBZ_PAY_APP_KEY: 'kbz-secret',
   KBZ_PAY_MERCHANT_CODE: '100001',
+  KBZ_PAY_BASE_URL: 'https://api.kbzpay.com/payment/gateway',
+  KBZ_PAY_PWA_BASE_REDIRECT_URL: 'https://static.kbzpay.com/pgw/pwa/#/',
   WAVE_MONEY_MERCHANT_ID: 'testmerchantID',
   WAVE_MONEY_SECRET_KEY: 'test-secret',
   WAVE_MONEY_MERCHANT_NAME: 'Shop',
   WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS: '300',
+  WAVE_MONEY_BASE_URL: 'https://payments.wavemoney.io',
+  WAVE_MONEY_BASE_REDIRECT_URL: 'https://payments.wavemoney.io',
   AYA_PAY_APP_KEY: 'aya-key',
   AYA_PAY_APP_SECRET: 'test-secret',
+  AYA_PAY_BASE_URL: 'https://api.ayapay.com',
   YOMA_MMQR_MERCHANT_ID: 'M001',
   YOMA_MMQR_CLIENT_ID: 'client',
   YOMA_MMQR_CLIENT_SECRET: 'secret',
   YOMA_MMQR_WEBHOOK_HASHKEY: 'hash-key',
   YOMA_MMQR_API_VERSION: 'v1rc',
+  YOMA_MMQR_WEBHOOK_SECRET: 'webhook-secret',
+  YOMA_MMQR_BASE_URL: 'https://api.yomabank.com',
   CYBER_SOURCE_PROFILE_ID: 'profile',
   CYBER_SOURCE_ACCESS_KEY: 'access',
   CYBER_SOURCE_SECRET_KEY: 'cs-secret',
+  CYBER_SOURCE_BASE_URL: 'https://secureacceptance.cybersource.com',
   MYANMAR_PAYMENTS_FORM_KEY: 'form-secret-of-at-least-32-bytes',
 } as const;
 
@@ -75,6 +83,8 @@ export async function createApp(options: AppOptions): Promise<INestApplication> 
 export interface SignedCallback {
   body: string;
   contentType: string;
+  /** Headers the gateway sends besides the content type. */
+  headers: Record<string, string>;
   orderId: string;
   /** The acknowledgement body the gateway expects. */
   acknowledgement: string;
@@ -105,6 +115,7 @@ export const callbacks = {
     return {
       body: JSON.stringify({ Request: fields }),
       contentType: 'application/json',
+      headers: {},
       orderId: 'ORDER_1',
       acknowledgement: 'success',
     };
@@ -126,6 +137,7 @@ export const callbacks = {
     return {
       body: JSON.stringify(payload),
       contentType: 'application/json',
+      headers: {},
       orderId: '100',
       acknowledgement: '',
     };
@@ -148,6 +160,7 @@ export const callbacks = {
         checkSum,
       }).toString(),
       contentType: 'application/x-www-form-urlencoded',
+      headers: {},
       orderId: 'ORD123456',
       acknowledgement: '',
     };
@@ -162,6 +175,7 @@ export const callbacks = {
     return {
       body: JSON.stringify({ orderNumber, status: tamper ? 'fail' : 'success', hashValue }),
       contentType: 'application/json',
+      headers: { 'X-Webhook-Secret': ENV.YOMA_MMQR_WEBHOOK_SECRET },
       orderId: orderNumber,
       acknowledgement: '',
     };
@@ -189,6 +203,7 @@ export const callbacks = {
     return {
       body: new URLSearchParams(fields).toString(),
       contentType: 'application/x-www-form-urlencoded',
+      headers: {},
       orderId: 'ORD-CS-1',
       acknowledgement: '',
     };
