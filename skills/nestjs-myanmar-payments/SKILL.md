@@ -36,7 +36,7 @@ Gateway calls go through `fetch`, Yoma MMQR tokens through `@nestjs/cache-manage
 
 ## Configure
 
-Set the env keys of the gateways you use. Every gateway defaults to its production URLs; to test against UAT, set the URL overrides (`KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `WAVE_MONEY_BASE_URL`, `WAVE_MONEY_AUTHENTICATE_URL`, `AYA_PAY_BASE_URL`, `YOMA_MMQR_BASE_URL`, `CYBER_SOURCE_BASE_URL`) to the gateway's UAT URLs. Every other setting is required, with no defaults, unless marked optional:
+Set the env keys of the gateways you use. Every gateway defaults to its production URLs; to test against UAT, set the URL overrides (`KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `WAVE_MONEY_BASE_URL`, `AYA_PAY_BASE_URL`, `YOMA_MMQR_BASE_URL`, `CYBER_SOURCE_BASE_URL`) to the gateway's UAT URLs. Every other setting is required, with no defaults, unless marked optional:
 
 - KBZ Pay: `KBZ_PAY_APP_ID`, `KBZ_PAY_APP_KEY`, `KBZ_PAY_MERCHANT_CODE`, optional `KBZ_PAY_TIME_TO_LIVE_IN_MINUTES` (1 to 120; a payment's `timeToLiveMinutes` overrides it)
 - Wave Money: `WAVE_MONEY_MERCHANT_ID`, `WAVE_MONEY_SECRET_KEY`, `WAVE_MONEY_MERCHANT_NAME`, optional `WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS` (greater than 0; a payment's `timeToLiveSeconds` overrides it)
