@@ -43,9 +43,9 @@ Set the env keys of the gateways you use. Every setting of those gateways is req
 - AYA Pay: `AYA_PAY_APP_KEY`, `AYA_PAY_APP_SECRET`, `AYA_PAY_BASE_URL`
 - Yoma MMQR: `YOMA_MMQR_MERCHANT_ID`, `YOMA_MMQR_CLIENT_ID`, `YOMA_MMQR_CLIENT_SECRET`, `YOMA_MMQR_WEBHOOK_HASHKEY`, `YOMA_MMQR_API_VERSION` (e.g. `v1rc`), `YOMA_MMQR_WEBHOOK_SECRET` (every callback must carry it in the `x-webhook-secret` header), `YOMA_MMQR_BASE_URL`
 - CyberSource: `CYBER_SOURCE_PROFILE_ID`, `CYBER_SOURCE_ACCESS_KEY`, `CYBER_SOURCE_SECRET_KEY`, `CYBER_SOURCE_BASE_URL`
-- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret, at least 32 bytes, e.g. `base64:` followed by 32 random bytes in base64)
+- Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links; `http://localhost` when unset), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret, at least 32 bytes, e.g. `base64:` followed by 32 random bytes in base64)
 
-Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `wavePay`, `ayaPay`, `yomaMmqr`, `cyberSource`; these win over the environment and need every required setting, e.g. `{ appId, appKey, merchantCode, apiUrl, pwaUrl, timeToLiveMinutes }`; `timeoutSeconds` is optional and defaults to 30), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`, `nonce`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
+Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `wavePay`, `ayaPay`, `yomaMmqr`, `cyberSource`; merged with the environment per setting: a setting given here wins, every other one is read from its variable, e.g. `kbzPay: { appId }` still reads `KBZ_PAY_APP_KEY` and the rest; `timeoutSeconds` falls back to `MYANMAR_PAYMENTS_HTTP_TIMEOUT`, then 30; an SDK config instance such as `new KbzPayConfig(...)` is used as it is), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`, `nonce`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
 
 A gateway with a missing setting throws the SDK's `ConfigurationError` naming the key when first used, not at startup; a time setting that is not a whole number greater than 0 throws it too.
 
@@ -89,7 +89,7 @@ export class CheckoutController {
 
 ### Form payments (AYA Pay, CyberSource)
 
-`ayaPay().initiate()` and `cyberSource().initiate()` return a `FormPayment` the customer's browser must POST. Redirect to `this.payments.autoSubmitUrl(payment)`: a link to the module's `GET myanmar-payments/form` route, encrypted with AES-256-GCM and valid for `formLink.ttlMinutes` minutes (required); a tampered or expired link answers 410. Or send `payment.toHtml()` yourself.
+`ayaPay().initiate()` and `cyberSource().initiate()` return a `FormPayment` the customer's browser must POST. Redirect to `this.payments.autoSubmitUrl(payment)`: a link to the module's `GET myanmar-payments/form` route, encrypted with AES-256-GCM and valid for `formLink.ttlMinutes` minutes (required); a tampered or expired link answers 410. With `formRoute.enabled: false` it throws "The form route is disabled (formRoute.enabled is false)." and without a TTL a `ConfigurationError` (`initiate()` needs neither). Or send `payment.toHtml()` yourself.
 
 AYA Pay needs a channel: list them with `await this.payments.ayaPay().services()`, then:
 
@@ -156,4 +156,4 @@ export class PaymentCallbackController {
 - Passing floats as amounts.
 - Calling Yoma `initiate()` twice for one order (use `renewQr()`), or reusing a Wave `merchantReferenceId`.
 - Putting authentication guards on callback routes or the form route; gateways and redirected browsers have no session.
-- Forgetting `rawBody: true`: re-encoded JSON can change numbers and break signatures.
+- Forgetting `rawBody: true`: JSON callbacks then answer 400 "Enable rawBody: true in NestFactory.create() to verify JSON callbacks." (only CyberSource's form callbacks verify without it).

@@ -104,6 +104,55 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(payments.wavePay().config.merchantId).toBe('testmerchantID');
   });
 
+  it('merges gateway options with the environment per setting', async () => {
+    const payments = await service([
+      MyanmarPaymentsModule.forRoot({
+        env: { ...ENV, MYANMAR_PAYMENTS_HTTP_TIMEOUT: '12' },
+        kbzPay: { appId: 'explicit', appKey: undefined },
+        wavePay: { merchantName: 'Option shop' },
+        cyberSource: { profileId: 'option-profile' },
+      }),
+    ]);
+    expect(payments.kbzPay().config).toMatchObject({
+      appId: 'explicit',
+      appKey: ENV.KBZ_PAY_APP_KEY,
+      merchantCode: ENV.KBZ_PAY_MERCHANT_CODE,
+      timeoutSeconds: 12,
+    });
+    expect(payments.wavePay().config).toMatchObject({
+      merchantName: 'Option shop',
+      merchantId: ENV.WAVE_PAY_MERCHANT_ID,
+      timeoutSeconds: 12,
+    });
+    expect(payments.cyberSource().config).toMatchObject({
+      profileId: 'option-profile',
+      accessKey: ENV.CYBER_SOURCE_ACCESS_KEY,
+    });
+
+    const partial = await service([
+      MyanmarPaymentsModule.forRoot({ env: {}, kbzPay: { appId: 'only-id' } }),
+    ]);
+    expect(() => partial.kbzPay()).toThrow('The kbz_pay configuration is missing [app_key].');
+  });
+
+  it('merges gateway options with a ConfigService environment', async () => {
+    const payments = await service([
+      MyanmarPaymentsModule.forRootAsync({
+        imports: [ConfigModule.forRoot({ ignoreEnvFile: true, load: [() => ({ ...ENV })] })],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          env: config,
+          yomaMmqr: { merchantId: 'option-merchant' },
+        }),
+      }),
+    ]);
+    expect(payments.yomaMmqr().config).toMatchObject({
+      merchantId: 'option-merchant',
+      clientId: ENV.YOMA_MMQR_CLIENT_ID,
+      timeoutSeconds: 30,
+    });
+  });
+
   it('accepts SDK config instances', async () => {
     const config = new KbzPayConfig({
       appId: 'instance',

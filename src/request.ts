@@ -6,7 +6,7 @@ import {
   type PaymentCallback,
   type ServerResponseLike,
 } from '@laranex/myanmar-payments';
-import { PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 
 /**
  * The most callback body bytes {@link callbackRequestFrom} accepts: 64 KiB, far above any gateway
@@ -41,10 +41,11 @@ export interface FastifyReplyLike {
 /**
  * Builds the SDK's `CallbackRequest` from a Nest request on the Express or Fastify adapter.
  *
- * The body is, in order: the exact bytes Nest kept with `rawBody: true` (recommended), the stream
- * when no body parser read it (Express), or the parsed body encoded again as JSON or a form. The
- * last one verifies for every gateway but rewrites JSON numbers, so enable `rawBody: true` in
- * `NestFactory.create()` for callbacks. A body over {@link MAX_CALLBACK_BODY_BYTES} answers
+ * The body is, in order: the exact bytes Nest kept with `rawBody: true` (required for JSON
+ * callbacks), the stream when no body parser read it (Express), or a parsed form body encoded
+ * again (CyberSource). A parsed JSON body is never encoded again, since that would rewrite its
+ * number text and break the signature: it answers `400 Bad Request` asking for `rawBody: true` in
+ * `NestFactory.create()`. A body over {@link MAX_CALLBACK_BODY_BYTES} answers
  * `413 Payload Too Large`; the stream stops being read as soon as it passes the limit.
  */
 export async function callbackRequestFrom(
@@ -76,6 +77,7 @@ export async function callbackRequestFrom(
     throw tooLarge();
   }
   const stream = isAsyncIterable(request) ? request : undefined;
+  let streamed = 0;
   const node: NodeRequestLike = {
     headers: request.headers,
     body: request.body,
@@ -87,6 +89,7 @@ export async function callbackRequestFrom(
         if (size > MAX_CALLBACK_BODY_BYTES) {
           throw tooLarge();
         }
+        streamed = size;
         yield chunk;
       }
     },
@@ -97,6 +100,11 @@ export async function callbackRequestFrom(
   } catch (error) {
     // Newer SDKs cap the body themselves; their only PaymentError here is an oversized body.
     throw error instanceof PaymentError ? tooLarge() : error;
+  }
+  if (streamed === 0 && isParsedJson(request.body, parsed.headers['content-type'])) {
+    throw new BadRequestException(
+      'Enable rawBody: true in NestFactory.create() to verify JSON callbacks.',
+    );
   }
   return limited(CallbackRequest.from({ body: parsed.body, headers: parsed.headers, query }));
 }
@@ -162,6 +170,18 @@ function tooLarge(): PayloadTooLargeException {
   return new PayloadTooLargeException(
     `The callback request body is larger than ${MAX_CALLBACK_BODY_BYTES} bytes.`,
   );
+}
+
+/**
+ * Whether the SDK encoded `body` again as JSON: a parsed object sent as JSON, or a non-empty one
+ * of any type but a form (forms are encoded again as a form, which keeps every value's text).
+ */
+function isParsedJson(body: unknown, contentType: string | undefined): boolean {
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    return false;
+  }
+  const type = (contentType ?? '').toLowerCase();
+  return type.includes('json') || (!type.includes('urlencoded') && Object.keys(body).length > 0);
 }
 
 function rawBytes(value: unknown): string | Uint8Array | undefined {

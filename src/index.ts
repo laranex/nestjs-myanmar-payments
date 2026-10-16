@@ -37,6 +37,7 @@ export type {
   FormLinkOptions,
   FormNonceResolver,
   FormRouteOptions,
+  GatewaySettings,
   MyanmarPaymentsModuleExtras,
   MyanmarPaymentsModuleOptions,
 } from './options.js';

@@ -1,7 +1,7 @@
 import { Readable } from 'node:stream';
 
 import { Acknowledgement, CallbackRequest, PaymentError } from '@laranex/myanmar-payments';
-import { PayloadTooLargeException } from '@nestjs/common';
+import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { acknowledge, callbackRequestFrom, type FastifyReplyLike } from '../src/index.js';
@@ -131,13 +131,25 @@ describe('callbackRequestFrom', () => {
     expect(request.query).toEqual({ y: '2' });
   });
 
-  it('encodes a parsed body again when the stream is gone', async () => {
-    const json = await callbackRequestFrom({
-      headers: { 'content-type': 'application/json' },
-      body: { orderId: 'A', amount: '10' },
-    });
-    expect(json.body).toBe('{"orderId":"A","amount":"10"}');
+  it('asks for the raw body instead of encoding a parsed JSON body again', async () => {
+    for (const request of [
+      { headers: { 'content-type': 'application/json' }, body: { amount: 1000.5 } },
+      { headers: { 'content-type': 'application/vnd.api+json; charset=utf-8' }, body: {} },
+      { headers: {}, body: { orderId: 'A' } },
+    ]) {
+      const error = await callbackRequestFrom(request).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(BadRequestException);
+      expect((error as Error).message).toBe(
+        'Enable rawBody: true in NestFactory.create() to verify JSON callbacks.',
+      );
+    }
+    const empty = await callbackRequestFrom({ headers: {}, body: {} });
+    expect(empty.body).toBe('{}');
+    const text = await callbackRequestFrom({ headers: {}, body: 'a=1' });
+    expect(text.body).toBe('a=1');
+  });
 
+  it('encodes a parsed form body again when the stream is gone', async () => {
     const form = await callbackRequestFrom({
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: { a: '1', b: ['2', '3'] },

@@ -164,7 +164,7 @@ describe('form route options', () => {
     }
   });
 
-  it('falls back to APP_KEY (base64) and builds relative links without APP_URL', async () => {
+  it('falls back to APP_KEY (base64) and builds http://localhost links without APP_URL', async () => {
     const app = await createApp({
       adapter: 'express',
       imports: [
@@ -178,8 +178,10 @@ describe('form route options', () => {
     });
     try {
       const url = app.get(MyanmarPaymentsService).autoSubmitUrl(form);
-      expect(url).toMatch(/^\/myanmar-payments\/form\?payload=/);
-      expect((await request(app.getHttpServer()).get(url)).status).toBe(200);
+      expect(url).toMatch(/^http:\/\/localhost\/myanmar-payments\/form\?payload=/);
+      expect(
+        (await request(app.getHttpServer()).get(url.slice('http://localhost'.length))).status,
+      ).toBe(200);
     } finally {
       await app.close();
     }
@@ -371,7 +373,7 @@ describe('form route options', () => {
     });
     try {
       expect(() => app.get(MyanmarPaymentsService).autoSubmitUrl(form)).toThrow(
-        /form route is disabled/,
+        'The form route is disabled (formRoute.enabled is false).',
       );
       expect((await request(app.getHttpServer()).get(`/${DEFAULT_FORM_PATH}`)).status).toBe(404);
     } finally {

@@ -1,7 +1,12 @@
 import {
+  AyaPayConfig,
   ConfigurationError,
+  CyberSourceConfig,
+  KbzPayConfig,
   MemoryTokenCache,
   MyanmarPayments,
+  WavePayConfig,
+  YomaMmqrConfig,
   type AyaPay,
   type CallbackRequest,
   type CyberSource,
@@ -34,7 +39,16 @@ import { CacheManagerTokenCache } from './token-cache.js';
 /** Any gateway; each one verifies callbacks with `handleCallback`. */
 export type MyanmarPaymentsGateway = KbzPay | WavePay | AyaPay | YomaMmqr | CyberSource;
 
-const GATEWAY_KEYS = ['kbzPay', 'wavePay', 'ayaPay', 'yomaMmqr', 'cyberSource'] as const;
+type GatewayKey = keyof Required<MyanmarPaymentsConfig>;
+
+/** Each gateway's SDK config class, whose `optionsFromEnv` reads its environment variables. */
+const CONFIG_TYPES = {
+  kbzPay: KbzPayConfig,
+  wavePay: WavePayConfig,
+  ayaPay: AyaPayConfig,
+  yomaMmqr: YomaMmqrConfig,
+  cyberSource: CyberSourceConfig,
+} as const;
 
 /**
  * The SDK's gateways, built from the module options or the environment on first use and reused,
@@ -45,8 +59,8 @@ export class MyanmarPaymentsService {
   /** The cache that keeps Yoma MMQR's access token. */
   readonly tokenCache: TokenCache;
   private readonly env: EnvSource;
-  private readonly configured: MyanmarPayments;
-  private readonly fromEnv: MyanmarPayments;
+  private readonly gatewayOptions: MyanmarPaymentsOptions;
+  private readonly facades: Partial<Record<GatewayKey, MyanmarPayments>> = {};
   private readonly formRoute: ResolvedFormRoute;
   private cipher: FormLinkCipher | undefined;
 
@@ -64,19 +78,11 @@ export class MyanmarPaymentsService {
         ? new CacheManagerTokenCache(cacheManager)
         : new MemoryTokenCache());
 
-    const gatewayOptions: MyanmarPaymentsOptions = {
+    this.gatewayOptions = {
       fetch: options.fetch,
       httpClient: options.httpClient,
       tokenCache: this.tokenCache,
     };
-    const config: MyanmarPaymentsConfig = {};
-    for (const key of GATEWAY_KEYS) {
-      if (options[key] !== undefined) {
-        Object.assign(config, { [key]: options[key] });
-      }
-    }
-    this.configured = new MyanmarPayments(config, gatewayOptions);
-    this.fromEnv = MyanmarPayments.fromEnv(this.env, gatewayOptions);
   }
 
   /** The KBZ Pay gateway. Throws a `ConfigurationError` when it is not configured. */
@@ -144,18 +150,17 @@ export class MyanmarPaymentsService {
    */
   autoSubmitUrl(form: FormPayment): string {
     if (!this.formRoute.enabled) {
-      throw new Error(
-        'The Myanmar payments form route is disabled (formRoute.enabled is false); serve form.toHtml() yourself.',
-      );
+      throw new Error('The form route is disabled (formRoute.enabled is false).');
     }
     const ttlMinutes = wholeMinutes(
       this.options.formLink?.ttlMinutes ?? envValue(this.env, 'MYANMAR_PAYMENTS_FORM_TTL_MINUTES'),
     );
     const payload = this.formCipher(true).seal(form, nowSeconds() + ttlMinutes * 60);
-    const baseUrl = (this.options.formLink?.baseUrl ?? envValue(this.env, 'APP_URL') ?? '').replace(
-      /\/+$/,
-      '',
-    );
+    const baseUrl = (
+      this.options.formLink?.baseUrl ??
+      envValue(this.env, 'APP_URL') ??
+      'http://localhost'
+    ).replace(/\/+$/, '');
     return `${baseUrl}${this.formPath()}?payload=${payload}`;
   }
 
@@ -164,8 +169,24 @@ export class MyanmarPaymentsService {
     return this.formCipher(false)?.open(payload, nowSeconds());
   }
 
-  private source(key: (typeof GATEWAY_KEYS)[number]): MyanmarPayments {
-    return this.options[key] === undefined ? this.fromEnv : this.configured;
+  /**
+   * The SDK facade holding the `key` gateway, built on first use. Each setting is the module
+   * option when it is given, else its environment variable (`MYANMAR_PAYMENTS_HTTP_TIMEOUT` for
+   * the timeout of every gateway but CyberSource); an SDK config instance is used as it is.
+   */
+  private source(key: GatewayKey): MyanmarPayments {
+    let facade = this.facades[key];
+    if (facade === undefined) {
+      const option = this.options[key];
+      const type = CONFIG_TYPES[key] as unknown as GatewayConfigType;
+      const config =
+        option instanceof type
+          ? option
+          : new type({ ...type.optionsFromEnv(this.env), ...definedOnly(option ?? {}) });
+      facade = new MyanmarPayments({ [key]: config }, this.gatewayOptions);
+      this.facades[key] = facade;
+    }
+    return facade;
   }
 
   private formPath(): string {
@@ -215,6 +236,17 @@ function wholeMinutes(value: number | string | undefined): number {
     throw new ConfigurationError('form_route', 'ttl_minutes', true);
   }
   return minutes;
+}
+
+/** A gateway config class, typed loosely so the five can be built the same way. */
+interface GatewayConfigType {
+  new (options: Record<string, unknown>): object;
+  optionsFromEnv(env: EnvSource): Record<string, unknown>;
+}
+
+/** `options` without its `undefined` values, so they don't hide the environment's. */
+function definedOnly(options: object): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
 }
 
 function nowSeconds(): number {

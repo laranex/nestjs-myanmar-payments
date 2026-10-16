@@ -1,16 +1,28 @@
 import type { CanActivate, Type } from '@nestjs/common';
 import type {
+  AyaPayConfig,
+  AyaPayConfigOptions,
+  CyberSourceConfig,
+  CyberSourceConfigOptions,
   EnvSource,
   FetchFunction,
   HttpClient,
-  MyanmarPaymentsConfig,
+  KbzPayConfig,
+  KbzPayConfigOptions,
   TokenCache,
+  WavePayConfig,
+  WavePayConfigOptions,
+  YomaMmqrConfig,
+  YomaMmqrConfigOptions,
 } from '@laranex/myanmar-payments';
 
 /** Anything with a `get(key)`, such as `ConfigService` from `@nestjs/config`. */
 export interface ConfigReader {
   get(key: string): unknown;
 }
+
+/** Any of a gateway's config options; `undefined` leaves the setting to the environment. */
+export type GatewaySettings<T> = { [K in keyof T]?: T[K] | undefined };
 
 /** Settings of the encrypted links {@link MyanmarPaymentsService.autoSubmitUrl} builds. */
 export interface FormLinkOptions {
@@ -24,24 +36,36 @@ export interface FormLinkOptions {
    * Required to build links; defaults to `MYANMAR_PAYMENTS_FORM_TTL_MINUTES`.
    */
   ttlMinutes?: number | string | undefined;
-  /** The scheme and host links start with. Defaults to `APP_URL`; without it links are relative. */
+  /** The scheme and host links start with. Defaults to `APP_URL`, then `http://localhost`. */
   baseUrl?: string | undefined;
 }
 
 /**
- * The module options. Every gateway left out is read from the environment with the SDK's
- * `fromEnv` (`KBZ_PAY_*`, `WAVE_PAY_*`, `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*`) the first
- * time it is used.
+ * The module options. Each gateway is built the first time it is used, from its options merged
+ * per setting with the environment the SDK's `fromEnv` reads (`KBZ_PAY_*`, `WAVE_PAY_*`,
+ * `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*` and `MYANMAR_PAYMENTS_HTTP_TIMEOUT`): a setting given
+ * here (not `undefined`) wins, every other one comes from its variable. An SDK config instance
+ * (e.g. `new KbzPayConfig(...)`) is used as it is.
  */
-export interface MyanmarPaymentsModuleOptions extends MyanmarPaymentsConfig {
+export interface MyanmarPaymentsModuleOptions {
+  /** KBZ Pay settings; the rest come from `KBZ_PAY_*`. */
+  kbzPay?: KbzPayConfig | GatewaySettings<KbzPayConfigOptions> | undefined;
+  /** Wave Pay settings; the rest come from `WAVE_PAY_*`. */
+  wavePay?: WavePayConfig | GatewaySettings<WavePayConfigOptions> | undefined;
+  /** AYA Pay settings; the rest come from `AYA_PAY_*`. */
+  ayaPay?: AyaPayConfig | GatewaySettings<AyaPayConfigOptions> | undefined;
+  /** Yoma MMQR settings; the rest come from `YOMA_MMQR_*`. */
+  yomaMmqr?: YomaMmqrConfig | GatewaySettings<YomaMmqrConfigOptions> | undefined;
+  /** CyberSource settings; the rest come from `CYBER_SOURCE_*`. */
+  cyberSource?: CyberSourceConfig | GatewaySettings<CyberSourceConfigOptions> | undefined;
   /** Where to read environment variables: `process.env` (default), a record or a `ConfigService`. */
   env?: EnvSource | ConfigReader | undefined;
   /** The `fetch` gateways call, e.g. a fake one in tests. */
   fetch?: FetchFunction | undefined;
   /**
    * Sends gateway requests, with its own timeout; takes precedence over `fetch`. Without one,
-   * each gateway uses the SDK's fetch client with its config's `timeoutSeconds`
-   * (`MYANMAR_PAYMENTS_HTTP_TIMEOUT` from the environment, 30 seconds when unset or blank).
+   * each gateway uses the SDK's fetch client with its config's `timeoutSeconds` (the option, else
+   * `MYANMAR_PAYMENTS_HTTP_TIMEOUT`, else 30 seconds).
    */
   httpClient?: HttpClient | undefined;
   /** Keeps Yoma MMQR's access token. Defaults to Nest's cache manager when present, else memory. */

@@ -106,9 +106,16 @@ class CallbackController {
   }
 }
 
+/** The gateways whose callbacks are forms, which verify without `rawBody: true` too. */
+const FORM_GATEWAYS = GATEWAY_NAMES.filter((name) =>
+  callbacks[name]().contentType.includes('form'),
+);
+const JSON_GATEWAYS = GATEWAY_NAMES.filter((name) => !FORM_GATEWAYS.includes(name));
+
 describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
   describe.each([true, false])('rawBody: %s', (rawBody) => {
     let app: INestApplication;
+    const verifiable = rawBody ? GATEWAY_NAMES : FORM_GATEWAYS;
 
     beforeAll(async () => {
       app = await createApp({
@@ -122,7 +129,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       await app.close();
     });
 
-    it.each(GATEWAY_NAMES)('verifies and acknowledges a %s callback', async (gateway) => {
+    it.each(verifiable)('verifies and acknowledges a %s callback', async (gateway) => {
       const signed = callbacks[gateway]();
       received.length = 0;
       const response = await request(app.getHttpServer())
@@ -139,7 +146,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       expect(received[0]).toMatchObject({ orderId: signed.orderId, status: 'successful' });
     });
 
-    it.each(GATEWAY_NAMES)('answers 400 to a tampered %s callback', async (gateway) => {
+    it.each(verifiable)('answers 400 to a tampered %s callback', async (gateway) => {
       const signed = callbacks[gateway](true);
       received.length = 0;
       const response = await request(app.getHttpServer())
@@ -170,7 +177,7 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       },
     );
 
-    it.each(GATEWAY_NAMES)('acknowledges a %s callback through @Res()', async (gateway) => {
+    it.each(verifiable)('acknowledges a %s callback through @Res()', async (gateway) => {
       const signed = callbacks[gateway]();
       const response = await request(app.getHttpServer())
         .post(`/payments/callback/manual/${gateway}`)
@@ -189,6 +196,27 @@ describe.each(ADAPTERS)('callbacks on %s', (adapter) => {
       expect(rejected.status).toBe(400);
       expect(rejected.text).toBe('invalid signature');
     });
+
+    it.runIf(!rawBody).each(JSON_GATEWAYS)(
+      'asks for rawBody: true instead of verifying a parsed %s JSON body',
+      async (gateway) => {
+        const signed = callbacks[gateway]();
+        received.length = 0;
+        for (const path of [gateway, `manual/${gateway}`]) {
+          const response = await request(app.getHttpServer())
+            .post(`/payments/callback/${path}`)
+            .set('Content-Type', signed.contentType)
+            .set(signed.headers)
+            .send(signed.body);
+          expect(response.status).toBe(400);
+          expect(response.body).toMatchObject({
+            statusCode: 400,
+            message: 'Enable rawBody: true in NestFactory.create() to verify JSON callbacks.',
+          });
+        }
+        expect(received).toHaveLength(0);
+      },
+    );
 
     it("answers with the acknowledgement's own status", async () => {
       const response = await request(app.getHttpServer()).post('/payments/callback/accepted');
