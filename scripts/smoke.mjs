@@ -16,6 +16,9 @@ const payments = new MyanmarPaymentsService({
     KBZ_PAY_APP_ID: 'a',
     KBZ_PAY_APP_KEY: 'k',
     KBZ_PAY_MERCHANT_CODE: 'm',
+    KBZ_PAY_BASE_URL: 'https://api.kbzpay.com/payment/gateway',
+    KBZ_PAY_PWA_BASE_REDIRECT_URL: 'https://static.kbzpay.com/pgw/pwa/#/',
+    KBZ_PAY_TIME_TO_LIVE_IN_MINUTES: '30',
     MYANMAR_PAYMENTS_HTTP_TIMEOUT: '30',
   },
 });
