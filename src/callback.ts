@@ -79,8 +79,13 @@ export class VerifiedCallbackPipe implements PipeTransform<
     value: Promise<CallbackRequest> | CallbackRequest,
     metadata: ArgumentMetadata,
   ): Promise<PaymentCallback> {
+    // Resolve the gateway (unknown name, missing settings) before the body errors, like
+    // handleCallback() and the other framework packages; the body read keeps running meanwhile.
+    const request = Promise.resolve(value);
+    request.catch(() => undefined);
     try {
-      return await this.payments.handleCallback(metadata.data as GatewayName, await value);
+      this.payments.gateway(metadata.data as GatewayName);
+      return await this.payments.handleCallback(metadata.data as GatewayName, await request);
     } catch (error) {
       if (error instanceof SignatureVerificationError) {
         throw new BadRequestException(error.message);

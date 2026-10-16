@@ -51,8 +51,8 @@ const CONFIG_TYPES = {
 } as const;
 
 /**
- * The SDK's gateways, built from the module options or the environment on first use and reused,
- * plus the helpers for callbacks and auto-submit form links.
+ * The SDK's gateways, built on first use from the module options merged per setting with the
+ * environment and reused, plus the helpers for callbacks and auto-submit form links.
  */
 @Injectable()
 export class MyanmarPaymentsService {

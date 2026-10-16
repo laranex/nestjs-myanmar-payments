@@ -252,6 +252,23 @@ describe('callbacks with an unconfigured gateway', () => {
       await app.close();
     }
   });
+
+  it('reports the gateway before an oversized body', async () => {
+    const app = await createApp({
+      adapter: 'express',
+      imports: [MyanmarPaymentsModule.forRoot({ env: {} })],
+      controllers: [CallbackController],
+    });
+    try {
+      const response = await request(app.getHttpServer())
+        .post('/payments/callback/kbz-pay')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify({ padding: 'x'.repeat(70_000) }));
+      expect(response.status).toBe(500);
+    } finally {
+      await app.close();
+    }
+  });
 });
 
 describe.each(ADAPTERS)('an oversized callback on %s', (adapter) => {
