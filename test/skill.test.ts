@@ -126,7 +126,7 @@ describe('the agent skill', () => {
     )[] = [
       'env',
       'kbzPay',
-      'waveMoney',
+      'wavePay',
       'ayaPay',
       'yomaMmqr',
       'cyberSource',

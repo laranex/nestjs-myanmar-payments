@@ -4,13 +4,13 @@
 [![Tests](https://github.com/laranex/nestjs-myanmar-payments/actions/workflows/tests.yml/badge.svg)](https://github.com/laranex/nestjs-myanmar-payments/actions/workflows/tests.yml)
 [![License](https://img.shields.io/npm/l/@laranex/nestjs-myanmar-payments.svg?style=flat-square)](LICENSE.md)
 
-NestJS integration for Myanmar payment gateways: KBZ Pay, Wave Money, AYA Pay, Yoma MMQR and CyberSource. Built on Node Myanmar Payments. Injectable module, verified callbacks and test fakes. Built for humans and AI agents.
+NestJS integration for Myanmar payment gateways: KBZ Pay, Wave Pay, AYA Pay, Yoma MMQR and CyberSource. Built on Node Myanmar Payments. Injectable module, verified callbacks and test fakes. Built for humans and AI agents.
 
 ## Why NestJS Myanmar Payments
 
-Every Myanmar payment gateway signs, sends and acknowledges payments its own way, with its own rules for amounts. NestJS Myanmar Payments puts KBZ Pay, Wave Money, AYA Pay, Yoma MMQR and CyberSource behind one injectable service. All gateway logic lives in [Node Myanmar Payments](https://laranex.vercel.app/node-myanmar-payments/introduction); this package wires it into NestJS.
+Every Myanmar payment gateway signs, sends and acknowledges payments its own way, with its own rules for amounts. NestJS Myanmar Payments puts KBZ Pay, Wave Pay, AYA Pay, Yoma MMQR and CyberSource behind one injectable service. All gateway logic lives in [Node Myanmar Payments](https://laranex.vercel.app/node-myanmar-payments/introduction); this package wires it into NestJS.
 
-- **One module, every gateway.** `MyanmarPaymentsModule.forRoot()` or `forRootAsync()` provides `MyanmarPaymentsService` with `kbzPay()`, `waveMoney()`, `ayaPay()`, `yomaMmqr()` and `cyberSource()`, configured from environment variables or module options.
+- **One module, every gateway.** `MyanmarPaymentsModule.forRoot()` or `forRootAsync()` provides `MyanmarPaymentsService` with `kbzPay()`, `wavePay()`, `ayaPay()`, `yomaMmqr()` and `cyberSource()`, configured from environment variables or module options.
 - **A typed result for each flow.** Every payment returns a `RedirectPayment`, `FormPayment`, `QrPayment` or `AppPayment`, so you always know what to do next. See [Payment Flows](https://laranex.vercel.app/nestjs-myanmar-payments/payment-flows).
 - **Exact amounts.** Whole numbers or `Amount` values, never floats, checked against each gateway's documented rules before any request is sent.
 - **Verified callbacks.** `@VerifiedCallback()` checks the gateway's signature against the exact body it sent and injects a `PaymentCallback` whose status is one `PaymentStatus`; `@AcknowledgeCallback()` sends the response the gateway expects.
@@ -43,7 +43,7 @@ The full documentation lives at **[laranex.vercel.app/nestjs-myanmar-payments](h
 - [Handling Webhooks](https://laranex.vercel.app/nestjs-myanmar-payments/webhooks): the recommended verify, store, acknowledge and process-once flow
 - [Testing](https://laranex.vercel.app/nestjs-myanmar-payments/testing): a fake `fetch`, signed callbacks with supertest, overriding the service and following form links
 - [KBZ Pay](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/kbz-pay): PWA redirect, QR and in-app payments, status checks and callbacks
-- [Wave Money](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/wave-money): redirect payments with line items and callbacks
+- [Wave Pay](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/wave-pay): redirect payments with line items and callbacks
 - [AYA Pay](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/aya-pay): the AYA Payment Gateway hosted checkout, channel discovery, status checks and callbacks
 - [Yoma MMQR](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/yoma-mmqr): QR images, QR renewal, status checks and callbacks
 - [CyberSource](https://laranex.vercel.app/nestjs-myanmar-payments/drivers/cyber-source): Secure Acceptance card payments with a signed hosted checkout form

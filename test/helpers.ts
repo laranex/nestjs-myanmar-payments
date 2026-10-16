@@ -23,12 +23,12 @@ export const ENV = {
   KBZ_PAY_MERCHANT_CODE: '100001',
   KBZ_PAY_BASE_URL: 'https://api.kbzpay.com/payment/gateway',
   KBZ_PAY_PWA_BASE_REDIRECT_URL: 'https://static.kbzpay.com/pgw/pwa/#/',
-  WAVE_MONEY_MERCHANT_ID: 'testmerchantID',
-  WAVE_MONEY_SECRET_KEY: 'test-secret',
-  WAVE_MONEY_MERCHANT_NAME: 'Shop',
-  WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS: '300',
-  WAVE_MONEY_BASE_URL: 'https://payments.wavemoney.io',
-  WAVE_MONEY_BASE_REDIRECT_URL: 'https://payments.wavemoney.io',
+  WAVE_PAY_MERCHANT_ID: 'testmerchantID',
+  WAVE_PAY_SECRET_KEY: 'test-secret',
+  WAVE_PAY_MERCHANT_NAME: 'Shop',
+  WAVE_PAY_TIME_TO_LIVE_IN_SECONDS: '300',
+  WAVE_PAY_BASE_URL: 'https://payments.wavemoney.io',
+  WAVE_PAY_BASE_REDIRECT_URL: 'https://payments.wavemoney.io',
   AYA_PAY_APP_KEY: 'aya-key',
   AYA_PAY_APP_SECRET: 'test-secret',
   AYA_PAY_BASE_URL: 'https://api.ayapay.com',
@@ -121,12 +121,12 @@ export const callbacks = {
     };
   },
 
-  'wave-money'(tamper = false): SignedCallback {
+  'wave-pay'(tamper = false): SignedCallback {
     const vector = fixture<{
       hash_string: string;
       secret_key: string;
       payload: Record<string, unknown>;
-    }>('wave-money-callback.json');
+    }>('wave-pay-callback.json');
     const payload: Record<string, unknown> = {
       ...vector.payload,
       hashValue: hmacHex(vector.secret_key, vector.hash_string),

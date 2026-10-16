@@ -35,9 +35,9 @@ class CallbackController {
     return callback;
   }
 
-  @Post('wave-money')
+  @Post('wave-pay')
   @AcknowledgeCallback()
-  waveMoney(@VerifiedCallback('wave-money') callback: PaymentCallback): PaymentCallback {
+  wavePay(@VerifiedCallback('wave-pay') callback: PaymentCallback): PaymentCallback {
     received.push(callback);
     return callback;
   }

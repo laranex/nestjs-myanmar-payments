@@ -30,7 +30,7 @@ export interface FormLinkOptions {
 
 /**
  * The module options. Every gateway left out is read from the environment with the SDK's
- * `fromEnv` (`KBZ_PAY_*`, `WAVE_MONEY_*`, `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*`) the first
+ * `fromEnv` (`KBZ_PAY_*`, `WAVE_PAY_*`, `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*`) the first
  * time it is used.
  */
 export interface MyanmarPaymentsModuleOptions extends MyanmarPaymentsConfig {

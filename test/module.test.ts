@@ -7,7 +7,7 @@ import {
   KbzPay,
   KbzPayConfig,
   MemoryTokenCache,
-  WaveMoney,
+  WavePay,
   YomaMmqr,
 } from '@laranex/myanmar-payments';
 import { Inject, Injectable, Module } from '@nestjs/common';
@@ -20,7 +20,7 @@ import {
   InjectAyaPay,
   InjectCyberSource,
   InjectKbzPay,
-  InjectWaveMoney,
+  InjectWavePay,
   InjectYomaMmqr,
   KBZ_PAY,
   MYANMAR_PAYMENTS_OPTIONS,
@@ -55,14 +55,14 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     const payments = await service([MyanmarPaymentsModule.forRoot({ env: ENV })]);
 
     expect(payments.kbzPay()).toBeInstanceOf(KbzPay);
-    expect(payments.waveMoney()).toBeInstanceOf(WaveMoney);
+    expect(payments.wavePay()).toBeInstanceOf(WavePay);
     expect(payments.ayaPay()).toBeInstanceOf(AyaPay);
     expect(payments.yomaMmqr()).toBeInstanceOf(YomaMmqr);
     expect(payments.cyberSource()).toBeInstanceOf(CyberSource);
     expect(payments.kbzPay().config.appId).toBe('kp123');
     expect(payments.kbzPay().config.apiUrl).toBe(KbzPayConfig.PRODUCTION_API_URL);
     expect(payments.kbzPay().config.timeoutSeconds).toBe(30);
-    expect(payments.waveMoney().config.timeToLiveSeconds).toBe(300);
+    expect(payments.wavePay().config.timeToLiveSeconds).toBe(300);
     expect(payments.yomaMmqr().config.apiVersion).toBe('v1rc');
   });
 
@@ -96,12 +96,12 @@ describe('MyanmarPaymentsModule.forRoot', () => {
           merchantCode: 'code',
           timeoutSeconds: 10,
         },
-        waveMoney: undefined,
+        wavePay: undefined,
       }),
     ]);
     expect(payments.kbzPay().config.appId).toBe('explicit');
     expect(payments.kbzPay().config.timeoutSeconds).toBe(10);
-    expect(payments.waveMoney().config.merchantId).toBe('testmerchantID');
+    expect(payments.wavePay().config.merchantId).toBe('testmerchantID');
   });
 
   it('accepts SDK config instances', async () => {
@@ -127,12 +127,12 @@ describe('MyanmarPaymentsModule.forRoot', () => {
   it('maps gateway names and rejects unknown ones', async () => {
     const payments = await service([MyanmarPaymentsModule.forRoot({ env: ENV })]);
     expect(payments.gateway('kbz-pay')).toBe(payments.kbzPay());
-    expect(payments.gateway('wave-money')).toBe(payments.waveMoney());
+    expect(payments.gateway('wave-pay')).toBe(payments.wavePay());
     expect(payments.gateway('aya-pay')).toBe(payments.ayaPay());
     expect(payments.gateway('yoma-mmqr')).toBe(payments.yomaMmqr());
     expect(payments.gateway('cyber-source')).toBe(payments.cyberSource());
     expect(() => payments.gateway('paypal' as GatewayName)).toThrow(
-      'Unknown payment gateway [paypal]; use one of kbz-pay, wave-money, aya-pay, yoma-mmqr, cyber-source.',
+      'Unknown payment gateway [paypal]; use one of kbz-pay, wave-pay, aya-pay, yoma-mmqr, cyber-source.',
     );
   });
 
@@ -162,7 +162,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       const payments = await service([MyanmarPaymentsModule.forRoot({ env })]);
       for (const config of [
         payments.kbzPay().config,
-        payments.waveMoney().config,
+        payments.wavePay().config,
         payments.ayaPay().config,
         payments.yomaMmqr().config,
       ]) {
@@ -184,16 +184,16 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== key));
 
     const ttl = await service([
-      MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_TIME_TO_LIVE_IN_SECONDS') }),
+      MyanmarPaymentsModule.forRoot({ env: without('WAVE_PAY_TIME_TO_LIVE_IN_SECONDS') }),
     ]);
-    expect(() => ttl.waveMoney()).toThrow(
-      'The wave_money configuration is missing [time_to_live_in_seconds].',
+    expect(() => ttl.wavePay()).toThrow(
+      'The wave_pay configuration is missing [time_to_live_in_seconds].',
     );
     const redirect = await service([
-      MyanmarPaymentsModule.forRoot({ env: without('WAVE_MONEY_BASE_REDIRECT_URL') }),
+      MyanmarPaymentsModule.forRoot({ env: without('WAVE_PAY_BASE_REDIRECT_URL') }),
     ]);
-    expect(() => redirect.waveMoney()).toThrow(
-      'The wave_money configuration is missing [base_redirect_url].',
+    expect(() => redirect.wavePay()).toThrow(
+      'The wave_pay configuration is missing [base_redirect_url].',
     );
     const secret = await service([
       MyanmarPaymentsModule.forRoot({ env: without('YOMA_MMQR_WEBHOOK_SECRET') }),
@@ -209,12 +209,10 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     );
     const name = await service([
       MyanmarPaymentsModule.forRoot({
-        env: { ...without('WAVE_MONEY_MERCHANT_NAME'), APP_NAME: 'Shop' },
+        env: { ...without('WAVE_PAY_MERCHANT_NAME'), APP_NAME: 'Shop' },
       }),
     ]);
-    expect(() => name.waveMoney()).toThrow(
-      'The wave_money configuration is missing [merchant_name].',
-    );
+    expect(() => name.wavePay()).toThrow('The wave_pay configuration is missing [merchant_name].');
     const invalid = await service([
       MyanmarPaymentsModule.forRoot({ env: { ...ENV, MYANMAR_PAYMENTS_HTTP_TIMEOUT: 'soon' } }),
     ]);
@@ -380,7 +378,7 @@ describe('gateway injection', () => {
   class Gateways {
     constructor(
       @InjectKbzPay() readonly kbzPay: KbzPay,
-      @InjectWaveMoney() readonly waveMoney: WaveMoney,
+      @InjectWavePay() readonly wavePay: WavePay,
       @InjectAyaPay() readonly ayaPay: AyaPay,
       @InjectYomaMmqr() readonly yomaMmqr: YomaMmqr,
       @InjectCyberSource() readonly cyberSource: CyberSource,
@@ -399,13 +397,13 @@ describe('gateway injection', () => {
   it('injects the SDK gateways', async () => {
     const injected = await gateways({ env: ENV });
     expect(injected.kbzPay).toBeInstanceOf(KbzPay);
-    expect(injected.waveMoney).toBeInstanceOf(WaveMoney);
+    expect(injected.wavePay).toBeInstanceOf(WavePay);
     expect(injected.ayaPay).toBeInstanceOf(AyaPay);
     expect(injected.yomaMmqr).toBeInstanceOf(YomaMmqr);
     expect(injected.cyberSource).toBeInstanceOf(CyberSource);
     expect(injected.kbzPay.constructor).toBe(KbzPay);
     expect(injected.kbzPay.config.appId).toBe('kp123');
-    expect(injected.waveMoney.config.merchantId).toBe('testmerchantID');
+    expect(injected.wavePay.config.merchantId).toBe('testmerchantID');
     expect(injected.ayaPay.config.appKey).toBe('aya-key');
     expect(injected.yomaMmqr.config.merchantId).toBe('M001');
     expect(injected.cyberSource.config.profileId).toBe('profile');

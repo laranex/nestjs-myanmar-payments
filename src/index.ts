@@ -12,7 +12,7 @@ export {
   DEFAULT_FORM_PATH,
   KBZ_PAY,
   MYANMAR_PAYMENTS_OPTIONS,
-  WAVE_MONEY,
+  WAVE_PAY,
   YOMA_MMQR,
 } from './constants.js';
 export { FormPaymentController } from './form-payment.controller.js';
@@ -21,7 +21,7 @@ export {
   InjectAyaPay,
   InjectCyberSource,
   InjectKbzPay,
-  InjectWaveMoney,
+  InjectWavePay,
   InjectYomaMmqr,
   type GatewayName,
 } from './gateways.js';

@@ -12,7 +12,7 @@ import {
   type MyanmarPaymentsOptions,
   type PaymentCallback,
   type TokenCache,
-  type WaveMoney,
+  type WavePay,
   type YomaMmqr,
 } from '@laranex/myanmar-payments';
 import { Inject, Injectable, Optional } from '@nestjs/common';
@@ -32,9 +32,9 @@ import { callbackRequestFrom, type NestRequestLike } from './request.js';
 import { CacheManagerTokenCache } from './token-cache.js';
 
 /** Any gateway; each one verifies callbacks with `handleCallback`. */
-export type MyanmarPaymentsGateway = KbzPay | WaveMoney | AyaPay | YomaMmqr | CyberSource;
+export type MyanmarPaymentsGateway = KbzPay | WavePay | AyaPay | YomaMmqr | CyberSource;
 
-const GATEWAY_KEYS = ['kbzPay', 'waveMoney', 'ayaPay', 'yomaMmqr', 'cyberSource'] as const;
+const GATEWAY_KEYS = ['kbzPay', 'wavePay', 'ayaPay', 'yomaMmqr', 'cyberSource'] as const;
 
 /**
  * The SDK's gateways, built from the module options or the environment on first use and reused,
@@ -84,9 +84,9 @@ export class MyanmarPaymentsService {
     return this.source('kbzPay').kbzPay();
   }
 
-  /** The Wave Money gateway. Throws a `ConfigurationError` when it is not configured. */
-  waveMoney(): WaveMoney {
-    return this.source('waveMoney').waveMoney();
+  /** The Wave Pay gateway. Throws a `ConfigurationError` when it is not configured. */
+  wavePay(): WavePay {
+    return this.source('wavePay').wavePay();
   }
 
   /** The AYA Payment Gateway. Throws a `ConfigurationError` when it is not configured. */
@@ -109,8 +109,8 @@ export class MyanmarPaymentsService {
     switch (name) {
       case 'kbz-pay':
         return this.kbzPay();
-      case 'wave-money':
-        return this.waveMoney();
+      case 'wave-pay':
+        return this.wavePay();
       case 'aya-pay':
         return this.ayaPay();
       case 'yoma-mmqr':
