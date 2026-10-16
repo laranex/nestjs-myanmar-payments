@@ -35,6 +35,7 @@ export { MyanmarPaymentsService, type MyanmarPaymentsGateway } from './myanmar-p
 export type {
   ConfigReader,
   FormLinkOptions,
+  FormNonceResolver,
   FormRouteOptions,
   MyanmarPaymentsModuleExtras,
   MyanmarPaymentsModuleOptions,

@@ -36,7 +36,7 @@ The full documentation lives at **[laranex.vercel.app/nestjs-myanmar-payments](h
 - [Introduction](https://laranex.vercel.app/nestjs-myanmar-payments/introduction): what NestJS Myanmar Payments does and why to use it
 - [Installation](https://laranex.vercel.app/nestjs-myanmar-payments/installation): registering the module, keeping the raw body and what the package exports
 - [AI Agent Skill](https://laranex.vercel.app/nestjs-myanmar-payments/ai-agent-skill): installing the agent skill with `npx skills add`
-- [Configuration](https://laranex.vercel.app/nestjs-myanmar-payments/configuration): environment variables, endpoints, UAT testing, the HTTP client, the auto-submit form route and the cache
+- [Configuration](https://laranex.vercel.app/nestjs-myanmar-payments/configuration): environment variables, production and UAT endpoints, the HTTP client, the auto-submit form route and the cache
 - [Amounts](https://laranex.vercel.app/nestjs-myanmar-payments/amounts): exact amounts and each gateway's rules for decimals and minimums
 - [Payment Flows](https://laranex.vercel.app/nestjs-myanmar-payments/payment-flows): redirect, form, QR and app payments and the typed result each returns
 - [Callbacks & Status](https://laranex.vercel.app/nestjs-myanmar-payments/callbacks): verifying callbacks, `PaymentStatus`, acknowledging and status checks

@@ -64,17 +64,17 @@ Pass an `Amount` (`Amount.kyat(10000)`, `Amount.parse('10000.50')`) or a whole n
 ```ts
 import { Amount } from '@laranex/myanmar-payments';
 import { MyanmarPaymentsService } from '@laranex/nestjs-myanmar-payments';
-import { Controller, Get, Redirect } from '@nestjs/common';
+import { Controller, Get, Param, Redirect } from '@nestjs/common';
 
 @Controller('checkout')
 export class CheckoutController {
   constructor(private readonly payments: MyanmarPaymentsService) {}
 
-  @Get('kbz-pay')
+  @Get(':id/kbz-pay')
   @Redirect()
-  async kbzPay(): Promise<{ url: string }> {
+  async kbzPay(@Param('id') id: string): Promise<{ url: string }> {
     const payment = await this.payments.kbzPay().pwa({
-      orderId: `ORDER_${order.id}`,
+      orderId: `ORDER_${id}`,
       amount: Amount.kyat(10000),
       callbackUrl: 'https://shop.test/payments/kbz/callback',
     });
