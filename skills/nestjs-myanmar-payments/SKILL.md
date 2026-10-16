@@ -83,7 +83,7 @@ export class CheckoutController {
 }
 ```
 
-- `RedirectPayment` from `kbzPay().pwa()` and `wavePay().initiate()`: redirect to `payment.url`. For Wave, store `data.merchantReferenceId` with the order; Wave's `orderId` and `merchantReferenceId` take only letters, digits, `_` and `-` (at most 100 characters), and `callbackUrl`, `returnUrl` and `description` take at most 255. Pass `merchantName` or `timeToLiveSeconds` in Wave's payment data to override the configured `WAVE_PAY_MERCHANT_NAME` or `WAVE_PAY_TIME_TO_LIVE_IN_SECONDS` for that one payment (the merchant name setting stays required), and `additionalField3` to `additionalField5` (at most 50 characters each) for extra information Wave echoes in the callback.
+- `RedirectPayment` from `kbzPay().pwa()` and `wavePay().initiate()`: redirect to `payment.url`. For Wave, store `data.merchantReferenceId` with the order; Wave's `orderId` and `merchantReferenceId` take only letters, digits, `_` and `-` (at most 100 characters), and `callbackUrl`, `returnUrl` and `description` take at most 255 (lengths count UTF-8 bytes). Pass `merchantName` or `timeToLiveSeconds` in Wave's payment data to override the configured `WAVE_PAY_MERCHANT_NAME` or `WAVE_PAY_TIME_TO_LIVE_IN_SECONDS` for that one payment (the merchant name setting stays required), and `additionalField3` to `additionalField5` (at most 50 characters each) for extra information Wave echoes in the callback.
 - `QrPayment` from `kbzPay().qr()` (encode `qrString`) and `yomaMmqr().initiate()` (`qrImage` as base64, `qrImageDataUri()`, `expiresAt`, `reference`). Renew an expired Yoma QR with `yomaMmqr().renewQr(orderId)`.
 - `AppPayment` from `kbzPay().app()`: return it as JSON to the mobile app.
 
