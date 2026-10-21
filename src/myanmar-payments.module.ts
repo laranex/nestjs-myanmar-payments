@@ -1,4 +1,11 @@
-import { AyaPay, CyberSource, KbzPay, WavePay, YomaMmqr } from '@laranex/myanmar-payments';
+import {
+  AyaPay,
+  CyberSource,
+  KbzPay,
+  WavePay,
+  WavePayMiniApp,
+  YomaMmqr,
+} from '@laranex/myanmar-payments';
 import {
   ConfigurableModuleBuilder,
   Module,
@@ -15,6 +22,7 @@ import {
   MYANMAR_PAYMENTS_FORM_ROUTE,
   MYANMAR_PAYMENTS_OPTIONS,
   WAVE_PAY,
+  WAVE_PAY_MINI_APP,
   YOMA_MMQR,
 } from './constants.js';
 import { formPaymentController } from './form-payment.controller.js';
@@ -90,6 +98,7 @@ function gatewayProvider<T extends object>(
 const gatewayProviders: Provider[] = [
   gatewayProvider(KBZ_PAY, KbzPay, (payments) => payments.kbzPay()),
   gatewayProvider(WAVE_PAY, WavePay, (payments) => payments.wavePay()),
+  gatewayProvider(WAVE_PAY_MINI_APP, WavePayMiniApp, (payments) => payments.wavePayMiniApp()),
   gatewayProvider(AYA_PAY, AyaPay, (payments) => payments.ayaPay()),
   gatewayProvider(YOMA_MMQR, YomaMmqr, (payments) => payments.yomaMmqr()),
   gatewayProvider(CYBER_SOURCE, CyberSource, (payments) => payments.cyberSource()),
@@ -101,6 +110,7 @@ const exported = [
   AcknowledgementInterceptor,
   KBZ_PAY,
   WAVE_PAY,
+  WAVE_PAY_MINI_APP,
   AYA_PAY,
   YOMA_MMQR,
   CYBER_SOURCE,

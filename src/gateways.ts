@@ -1,14 +1,23 @@
 import { Inject } from '@nestjs/common';
 
-import { AYA_PAY, CYBER_SOURCE, KBZ_PAY, WAVE_PAY, YOMA_MMQR } from './constants.js';
+import {
+  AYA_PAY,
+  CYBER_SOURCE,
+  KBZ_PAY,
+  WAVE_PAY,
+  WAVE_PAY_MINI_APP,
+  YOMA_MMQR,
+} from './constants.js';
 
 /** The gateway names used in callback routes and {@link MyanmarPaymentsService.gateway}. */
-export type GatewayName = 'kbz-pay' | 'wave-pay' | 'aya-pay' | 'yoma-mmqr' | 'cyber-source';
+export type GatewayName =
+  'kbz-pay' | 'wave-pay' | 'wave-pay-mini-app' | 'aya-pay' | 'yoma-mmqr' | 'cyber-source';
 
 /** Every {@link GatewayName}. */
 export const GATEWAY_NAMES: readonly GatewayName[] = Object.freeze([
   'kbz-pay',
   'wave-pay',
+  'wave-pay-mini-app',
   'aya-pay',
   'yoma-mmqr',
   'cyber-source',
@@ -18,6 +27,9 @@ export const GATEWAY_NAMES: readonly GatewayName[] = Object.freeze([
 export const InjectKbzPay = (): PropertyDecorator & ParameterDecorator => Inject(KBZ_PAY);
 /** Injects the SDK's `WavePay` gateway, built on first use. */
 export const InjectWavePay = (): PropertyDecorator & ParameterDecorator => Inject(WAVE_PAY);
+/** Injects the SDK's `WavePayMiniApp` gateway, built on first use. */
+export const InjectWavePayMiniApp = (): PropertyDecorator & ParameterDecorator =>
+  Inject(WAVE_PAY_MINI_APP);
 /** Injects the SDK's `AyaPay` gateway, built on first use. */
 export const InjectAyaPay = (): PropertyDecorator & ParameterDecorator => Inject(AYA_PAY);
 /** Injects the SDK's `YomaMmqr` gateway, built on first use. */

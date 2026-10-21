@@ -6,6 +6,7 @@ import {
   MemoryTokenCache,
   MyanmarPayments,
   WavePayConfig,
+  WavePayMiniAppConfig,
   YomaMmqrConfig,
   type AyaPay,
   type CallbackRequest,
@@ -18,6 +19,7 @@ import {
   type PaymentCallback,
   type TokenCache,
   type WavePay,
+  type WavePayMiniApp,
   type YomaMmqr,
 } from '@laranex/myanmar-payments';
 import { Inject, Injectable, Optional } from '@nestjs/common';
@@ -33,11 +35,17 @@ import { envSource, envValue } from './env.js';
 import { FormLinkCipher } from './form-link.js';
 import { GATEWAY_NAMES, type GatewayName } from './gateways.js';
 import type { MyanmarPaymentsModuleOptions, ResolvedFormRoute } from './options.js';
-import { callbackRequestFrom, type NestRequestLike } from './request.js';
+import {
+  callbackRequestFrom,
+  callbackUrlFrom,
+  isCallbackRequest,
+  type NestRequestLike,
+} from './request.js';
 import { CacheManagerTokenCache } from './token-cache.js';
 
 /** Any gateway; each one verifies callbacks with `handleCallback`. */
-export type MyanmarPaymentsGateway = KbzPay | WavePay | AyaPay | YomaMmqr | CyberSource;
+export type MyanmarPaymentsGateway =
+  KbzPay | WavePay | WavePayMiniApp | AyaPay | YomaMmqr | CyberSource;
 
 type GatewayKey = keyof Required<MyanmarPaymentsConfig>;
 
@@ -45,6 +53,7 @@ type GatewayKey = keyof Required<MyanmarPaymentsConfig>;
 const CONFIG_TYPES = {
   kbzPay: KbzPayConfig,
   wavePay: WavePayConfig,
+  wavePayMiniApp: WavePayMiniAppConfig,
   ayaPay: AyaPayConfig,
   yomaMmqr: YomaMmqrConfig,
   cyberSource: CyberSourceConfig,
@@ -56,7 +65,7 @@ const CONFIG_TYPES = {
  */
 @Injectable()
 export class MyanmarPaymentsService {
-  /** The cache that keeps Yoma MMQR's access token. */
+  /** The cache that keeps the Yoma MMQR and Wave Pay Mini App access tokens. */
   readonly tokenCache: TokenCache;
   private readonly env: EnvSource;
   private readonly gatewayOptions: MyanmarPaymentsOptions;
@@ -95,6 +104,14 @@ export class MyanmarPaymentsService {
     return this.source('wavePay').wavePay();
   }
 
+  /**
+   * The Wave Pay Mini App gateway. Throws a `ConfigurationError` when it is not configured. Its
+   * access tokens are kept in {@link tokenCache}.
+   */
+  wavePayMiniApp(): WavePayMiniApp {
+    return this.source('wavePayMiniApp').wavePayMiniApp();
+  }
+
   /** The AYA Payment Gateway. Throws a `ConfigurationError` when it is not configured. */
   ayaPay(): AyaPay {
     return this.source('ayaPay').ayaPay();
@@ -117,6 +134,8 @@ export class MyanmarPaymentsService {
         return this.kbzPay();
       case 'wave-pay':
         return this.wavePay();
+      case 'wave-pay-mini-app':
+        return this.wavePayMiniApp();
       case 'aya-pay':
         return this.ayaPay();
       case 'yoma-mmqr':
@@ -133,13 +152,32 @@ export class MyanmarPaymentsService {
   /**
    * Verifies a callback with the named gateway. Throws the SDK's `SignatureVerificationError`
    * when the signature does not match.
+   *
+   * `wave-pay-mini-app` verifies against the URL the callback was posted to
+   * ({@link callbackUrlFrom}), so it needs the Nest request rather than a `CallbackRequest`. When
+   * that is not the URL the payment was signed with (e.g. a proxy the app does not trust), call
+   * `wavePayMiniApp().handleCallback(request, callbackUrl)` instead.
    */
   async handleCallback(
     name: GatewayName,
     request: CallbackRequest | NestRequestLike,
   ): Promise<PaymentCallback> {
     const gateway = this.gateway(name);
-    return gateway.handleCallback(await callbackRequestFrom(request));
+    if (name === 'wave-pay-mini-app') {
+      if (isCallbackRequest(request)) {
+        throw new Error(
+          'Wave Pay Mini App callbacks are verified against the request URL: pass the Nest request, or call wavePayMiniApp().handleCallback(request, callbackUrl).',
+        );
+      }
+      const callbackUrl = callbackUrlFrom(request);
+      return (gateway as WavePayMiniApp).handleCallback(
+        await callbackRequestFrom(request),
+        callbackUrl,
+      );
+    }
+    return (gateway as Exclude<MyanmarPaymentsGateway, WavePayMiniApp>).handleCallback(
+      await callbackRequestFrom(request),
+    );
   }
 
   /**
@@ -238,7 +276,7 @@ function wholeMinutes(value: number | string | undefined): number {
   return minutes;
 }
 
-/** A gateway config class, typed loosely so the five can be built the same way. */
+/** A gateway config class, typed loosely so the six can be built the same way. */
 interface GatewayConfigType {
   new (options: Record<string, unknown>): object;
   optionsFromEnv(env: EnvSource): Record<string, unknown>;

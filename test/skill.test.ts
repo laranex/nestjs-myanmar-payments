@@ -71,11 +71,27 @@ const local = new Set([
   'JSON',
   'ORDER_1',
   'PAY_SUCCESS',
+  // Wave's JavaScript SDK, called by the mini app page.
+  'WaveJsSDK',
+  'Ticket',
+  // HTTP header names (X-Forwarded-Proto, X-Forwarded-Host).
+  'Forwarded',
+  'Proto',
+  'Host',
   // Gateway names in comments.
   'KBZ',
   'Pay',
 ]);
-const platform = new Set(['create', 'stringify', 'isSuccessful', 'url', 'sign']);
+const platform = new Set([
+  'create',
+  'stringify',
+  'isSuccessful',
+  'url',
+  'sign',
+  // Wave's JavaScript SDK, called by the mini app page.
+  'makePayment',
+  'loginWithAccessToken',
+]);
 
 describe('the agent skill', () => {
   it('has front matter naming the package', () => {
@@ -115,7 +131,7 @@ describe('the agent skill', () => {
         !exported.has(name) &&
         !platform.has(name) &&
         // Arrow functions and constructors in examples.
-        !['handle', 'kbzPay', 'useFactory', 'fakeFetch'].includes(name),
+        !['handle', 'kbzPay', 'useFactory', 'fakeFetch', 'token', 'pay'].includes(name),
     );
     expect(missing).toEqual([]);
   });
@@ -127,6 +143,7 @@ describe('the agent skill', () => {
       'env',
       'kbzPay',
       'wavePay',
+      'wavePayMiniApp',
       'ayaPay',
       'yomaMmqr',
       'cyberSource',

@@ -1,7 +1,7 @@
 ---
 name: nestjs-myanmar-payments
 description: >
-  Integrate Myanmar payment gateways (KBZ Pay, Wave Pay, AYA Pay, Yoma MMQR, CyberSource) in a NestJS app with @laranex/nestjs-myanmar-payments.
+  Integrate Myanmar payment gateways (KBZ Pay, Wave Pay, Wave Pay Mini App, AYA Pay, Yoma MMQR, CyberSource) in a NestJS app with @laranex/nestjs-myanmar-payments.
 license: MIT
 metadata:
   author: Nay Thu Khant
@@ -11,7 +11,7 @@ metadata:
 
 ## When to use
 
-Use this skill when a NestJS application starts a payment, handles a gateway callback or checks a payment status with KBZ Pay, Wave Pay, AYA Payment Gateway, Yoma MMQR or CyberSource. Start payments and verify callbacks with the package's typed API; never build gateway signatures by hand. The package wraps the Node SDK `@laranex/myanmar-payments`: gateways, payment data, results, statuses and errors are the SDK's classes, imported from `@laranex/myanmar-payments`.
+Use this skill when a NestJS application starts a payment, handles a gateway callback or checks a payment status with KBZ Pay, Wave Pay, Wave Pay Mini App (a web page running inside the WavePay app), AYA Payment Gateway, Yoma MMQR or CyberSource. Start payments and verify callbacks with the package's typed API; never build gateway signatures by hand. The package wraps the Node SDK `@laranex/myanmar-payments`: gateways, payment data, results, statuses and errors are the SDK's classes, imported from `@laranex/myanmar-payments`.
 
 ## Install
 
@@ -32,7 +32,7 @@ export class AppModule {}
 const app = await NestFactory.create(AppModule, { rawBody: true });
 ```
 
-Gateway calls go through `fetch`, Yoma MMQR tokens through `@nestjs/cache-manager` when it is registered, and auto-submit form links are encrypted with `formLink.secret`, `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY`.
+Gateway calls go through `fetch`, Yoma MMQR and Wave Pay Mini App access tokens through `@nestjs/cache-manager` when it is registered, and auto-submit form links are encrypted with `formLink.secret`, `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY`.
 
 ## Configure
 
@@ -40,22 +40,23 @@ Set the env keys of the gateways you use. Every setting of those gateways is req
 
 - KBZ Pay: `KBZ_PAY_APP_ID`, `KBZ_PAY_APP_KEY`, `KBZ_PAY_MERCHANT_CODE`, `KBZ_PAY_BASE_URL`, `KBZ_PAY_PWA_BASE_REDIRECT_URL`, `KBZ_PAY_TIME_TO_LIVE_IN_MINUTES` (1 to 120; a payment's `timeToLiveMinutes` overrides it)
 - Wave Pay: `WAVE_PAY_MERCHANT_ID`, `WAVE_PAY_SECRET_KEY`, `WAVE_PAY_MERCHANT_NAME`, `WAVE_PAY_BASE_URL` (payments are requested at its `/payment`), `WAVE_PAY_BASE_REDIRECT_URL` (the customer is sent to its `/authenticate`), `WAVE_PAY_TIME_TO_LIVE_IN_SECONDS` (greater than 0; a payment's `timeToLiveSeconds` overrides it)
+- Wave Pay Mini App: `WAVE_PAY_MINI_APP_CLIENT_ID`, `WAVE_PAY_MINI_APP_CLIENT_SECRET`, `WAVE_PAY_MINI_APP_MINI_APP_ID`, `WAVE_PAY_MINI_APP_SECRET_KEY`, `WAVE_PAY_MINI_APP_BASE_URL` (tokens are requested at its `/auth/v1/external-utility/token`)
 - AYA Pay: `AYA_PAY_APP_KEY`, `AYA_PAY_APP_SECRET`, `AYA_PAY_BASE_URL`
 - Yoma MMQR: `YOMA_MMQR_MERCHANT_ID`, `YOMA_MMQR_CLIENT_ID`, `YOMA_MMQR_CLIENT_SECRET`, `YOMA_MMQR_WEBHOOK_HASHKEY`, `YOMA_MMQR_API_VERSION` (e.g. `v1rc`), `YOMA_MMQR_WEBHOOK_SECRET` (every callback must carry it in the `x-webhook-secret` header), `YOMA_MMQR_BASE_URL`
 - CyberSource: `CYBER_SOURCE_PROFILE_ID`, `CYBER_SOURCE_ACCESS_KEY`, `CYBER_SOURCE_SECRET_KEY`, `CYBER_SOURCE_BASE_URL`
 - Shared: `MYANMAR_PAYMENTS_HTTP_TIMEOUT` (seconds, for every gateway except CyberSource; optional, defaults to 30), `MYANMAR_PAYMENTS_FORM_TTL_MINUTES` (form link lifetime), `APP_URL` (base of form links; `http://localhost` when unset), `MYANMAR_PAYMENTS_FORM_KEY` or `APP_KEY` (form link secret, at least 32 bytes, e.g. `base64:` followed by 32 random bytes in base64)
 
-Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `wavePay`, `ayaPay`, `yomaMmqr`, `cyberSource`; merged with the environment per setting: a setting given here wins, every other one is read from its variable, e.g. `kbzPay: { appId }` still reads `KBZ_PAY_APP_KEY` and the rest; `timeoutSeconds` falls back to `MYANMAR_PAYMENTS_HTTP_TIMEOUT`, then 30; an SDK config instance such as `new KbzPayConfig(...)` is used as it is), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`, `nonce`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
+Module options: `env` (`process.env`, a record or a `ConfigService`), per-gateway config (`kbzPay`, `wavePay`, `wavePayMiniApp`, `ayaPay`, `yomaMmqr`, `cyberSource`; merged with the environment per setting: a setting given here wins, every other one is read from its variable, e.g. `kbzPay: { appId }` still reads `KBZ_PAY_APP_KEY` and the rest; `timeoutSeconds` falls back to `MYANMAR_PAYMENTS_HTTP_TIMEOUT`, then 30; an SDK config instance such as `new KbzPayConfig(...)` is used as it is), `fetch`, `httpClient` (keeps its own timeout), `tokenCache`, `useCacheManager`, `formLink` (`secret`, `ttlMinutes`, `baseUrl`), and the extras `isGlobal` and `formRoute` (`enabled`, `path`, `guards`, `nonce`). With `@nestjs/config`: `MyanmarPaymentsModule.forRootAsync({ imports: [ConfigModule], inject: [ConfigService], useFactory: (config: ConfigService) => ({ env: config }) })`.
 
 A gateway with a missing setting throws the SDK's `ConfigurationError` naming the key when first used, not at startup; a time setting that is not a whole number greater than 0 throws it too.
 
 ## Use
 
-Every gateway is reached through the injected `MyanmarPaymentsService`: `kbzPay()`, `wavePay()`, `ayaPay()`, `yomaMmqr()` and `cyberSource()`, or `gateway('kbz-pay')` by name (`GATEWAY_NAMES` lists `kbz-pay`, `wave-pay`, `aya-pay`, `yoma-mmqr`, `cyber-source`). Each gateway is built once and reused. To inject one gateway: `@InjectKbzPay()`, `@InjectWavePay()`, `@InjectAyaPay()`, `@InjectYomaMmqr()`, `@InjectCyberSource()`.
+Every gateway is reached through the injected `MyanmarPaymentsService`: `kbzPay()`, `wavePay()`, `wavePayMiniApp()`, `ayaPay()`, `yomaMmqr()` and `cyberSource()`, or `gateway('kbz-pay')` by name (`GATEWAY_NAMES` lists `kbz-pay`, `wave-pay`, `wave-pay-mini-app`, `aya-pay`, `yoma-mmqr`, `cyber-source`). Each gateway is built once and reused. To inject one gateway: `@InjectKbzPay()`, `@InjectWavePay()`, `@InjectWavePayMiniApp()`, `@InjectAyaPay()`, `@InjectYomaMmqr()`, `@InjectCyberSource()`.
 
 ### Amounts
 
-Pass an `Amount` (`Amount.kyat(10000)`, `Amount.parse('10000.50')`) or a whole number, never a float. Only KBZ Pay (up to 2 decimals) and CyberSource accept decimals. Invalid data throws `InvalidPaymentDataError`; read the messages from its `errors`.
+Pass an `Amount` (`Amount.kyat(10000)`, `Amount.parse('10000.50')`) or a whole number, never a float. Only KBZ Pay (up to 2 decimals) and CyberSource accept decimals; Wave Pay, Wave Pay Mini App, AYA Pay and Yoma MMQR take whole kyat. Invalid data throws `InvalidPaymentDataError`; read the messages from its `errors`.
 
 - Compare a gateway's amount by value with `amount.equals(callback.amount)`: `'01000'`, `'1000'` and `'1000.00'` equal `Amount.kyat(1000)`; text that is not plain digits never does.
 
@@ -86,6 +87,29 @@ export class CheckoutController {
 - `RedirectPayment` from `kbzPay().pwa()` and `wavePay().initiate()`: redirect to `payment.url`. For Wave, store `data.merchantReferenceId` with the order; Wave's `orderId` and `merchantReferenceId` take only letters, digits, `_` and `-` (at most 100 characters), and `callbackUrl`, `returnUrl` and `description` take at most 255 (lengths count UTF-8 bytes). Pass `merchantName` or `timeToLiveSeconds` in Wave's payment data to override the configured `WAVE_PAY_MERCHANT_NAME` or `WAVE_PAY_TIME_TO_LIVE_IN_SECONDS` for that one payment (the merchant name setting stays required), and `additionalField3` to `additionalField5` (at most 50 characters each) for extra information Wave echoes in the callback.
 - `QrPayment` from `kbzPay().qr()` (encode `qrString`) and `yomaMmqr().initiate()` (`qrImage` as base64, `qrImageDataUri()`, `expiresAt`, `reference`). Renew an expired Yoma QR with `yomaMmqr().renewQr(orderId)`.
 - `AppPayment` from `kbzPay().app()`: return it as JSON to the mobile app.
+- `MiniAppPayment` from `wavePayMiniApp().payment()` (no network call): return it as JSON to your mini app page, which passes it unchanged to Wave's `WaveJsSDK.paymentModule.makePayment(payload)`.
+
+### Wave Pay Mini App
+
+Your page runs inside the WavePay app. Give it an access token from your server (cached in the module's token cache; the page calls `WaveJsSDK.authModule.loginWithAccessToken(token)`; never request the token from the browser, it needs the client secret), then sign the payment:
+
+```ts
+@Get('mini-app/token')
+async token(): Promise<{ token: string }> {
+  return { token: await this.payments.wavePayMiniApp().accessToken() };
+}
+
+@Post('mini-app/orders/:id/pay')
+pay(@Param('id') id: string): MiniAppPayment {
+  return this.payments.wavePayMiniApp().payment({
+    orderId: `ORDER_${id}`,
+    callbackUrl: 'https://shop.test/payments/wave-pay-mini-app/callback',
+    items: [{ name: 'Ticket', amount: 5000 }], // amount defaults to the items' sum
+  });
+}
+```
+
+`merchantReferenceId` is generated when empty (32 hex characters) and written back to the data object; store it with the order. The `callbackUrl` is signed into the hash, so it must be the URL of your callback route.
 
 ### Form payments (AYA Pay, CyberSource)
 
@@ -133,12 +157,13 @@ export class PaymentCallbackController {
 
 - `@AcknowledgeCallback()` answers with the reply each gateway expects so it stops retrying; by hand, `acknowledge(res, callback)` with `@Res()` (without a callback, an empty 200).
 - One route for every gateway: `@RawCallback() request: CallbackRequest`, then `await this.payments.handleCallback(gateway, request)` (throws `SignatureVerificationError`).
+- Wave Pay Mini App callbacks carry neither the mini app id nor the callback URL: `@VerifiedCallback('wave-pay-mini-app')` and `handleCallback('wave-pay-mini-app', req)` (pass the Nest request, not a `CallbackRequest`) verify against the URL the callback was posted to, `callbackUrlFrom(req)`: protocol, host and path without the query string, with `X-Forwarded-Proto` and `X-Forwarded-Host` counted only from a proxy the app trusts (Express `trust proxy`, Fastify `trustProxy`). When that differs from the signed URL, call `this.payments.wavePayMiniApp().handleCallback(request, 'https://shop.test/payments/wave-pay-mini-app/callback')`. `successful` is `successful`, `processing` is `pending`, `failed` is `failed`; `merchantRefId` is in `callback.raw`. Wave expects an empty 200.
 - Check AYA's browser return with `ayaPay().verifyRedirect(await callbackRequestFrom(req))`; it is never proof of payment.
 - For production, store the verified call, acknowledge immediately and process it once in the background; the docs show this flow as app code (the package stores nothing).
 
 ### Check status and handle errors
 
-- `kbzPay().status(orderId)`, `ayaPay().status(orderId)` and `yomaMmqr().status(reference)` return a `PaymentStatusResult` with `status` and `isSuccessful()`. Wave Pay and CyberSource have no status API.
+- `kbzPay().status(orderId)`, `ayaPay().status(orderId)` and `yomaMmqr().status(reference)` return a `PaymentStatusResult` with `status` and `isSuccessful()`. Wave Pay, Wave Pay Mini App and CyberSource have no status API.
 - Statuses are `PaymentStatus` values: `PaymentStatus.Successful`, `Pending`, `Failed`, `Canceled`, `Expired`, `Unknown`.
 - Gateway errors throw `ApiError` (`gatewayCode`, `gatewayMessage`, `httpStatus`, `raw`); catch `PaymentError` for every package error.
 
@@ -154,6 +179,7 @@ export class PaymentCallbackController {
 - Fulfilling orders from return pages or query strings; fulfill only from a verified callback or a status check.
 - Treating `Pending` or `Unknown` as paid, or skipping the amount check.
 - Passing floats as amounts.
+- Requesting the Wave Pay Mini App access token or computing its hash in the browser (both need secrets), or signing a mini app payment with a `callbackUrl` other than your callback route's URL.
 - Calling Yoma `initiate()` twice for one order (use `renewQr()`), or reusing a Wave `merchantReferenceId`.
 - Putting authentication guards on callback routes or the form route; gateways and redirected browsers have no session.
 - Forgetting `rawBody: true`: JSON callbacks then answer 400 "Enable rawBody: true in NestFactory.create() to verify JSON callbacks." (only CyberSource's form callbacks verify without it).

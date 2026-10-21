@@ -8,8 +8,8 @@ export interface CacheManagerLike {
 }
 
 /**
- * A `TokenCache` backed by Nest's cache manager (`@nestjs/cache-manager`), so Yoma MMQR access
- * tokens are shared by every process using the same store, e.g. Redis.
+ * A `TokenCache` backed by Nest's cache manager (`@nestjs/cache-manager`), so the Yoma MMQR and Wave
+ * Pay Mini App access tokens are shared by every process using the same store, e.g. Redis.
  */
 export class CacheManagerTokenCache implements TokenCache {
   constructor(private readonly cache: CacheManagerLike) {}

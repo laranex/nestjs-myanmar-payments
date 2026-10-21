@@ -76,6 +76,60 @@ describe('Yoma MMQR token cache', () => {
   });
 });
 
+describe('Wave Pay Mini App token cache', () => {
+  const miniAppRoutes = {
+    '/auth/v1/external-utility/token': { access_token: 'mini-token', expires_in: '7200' },
+  };
+
+  it('requests the token with the client credentials and keeps it in the Nest cache', async () => {
+    const fetch = fakeFetch(miniAppRoutes);
+    const moduleRef = await compile([
+      CacheModule.register({ isGlobal: true }),
+      MyanmarPaymentsModule.forRoot({ env: ENV, fetch }),
+    ]);
+    const payments = moduleRef.get(MyanmarPaymentsService);
+    const cache = moduleRef.get<CacheManagerLike>(CACHE_MANAGER);
+    const set = vi.spyOn(cache, 'set');
+
+    expect(await payments.wavePayMiniApp().accessToken()).toBe('mini-token');
+    expect(await payments.wavePayMiniApp().accessToken()).toBe('mini-token');
+
+    expect(fetch.requests).toHaveLength(1);
+    const [token] = fetch.requests;
+    expect(token?.url).toBe('https://wave-mini.test/auth/v1/external-utility/token');
+    expect(token?.method).toBe('POST');
+    expect(token?.headers.get('content-type')).toMatch(/^application\/x-www-form-urlencoded/);
+    expect(Object.fromEntries(new URLSearchParams(token?.body))).toEqual({
+      client_id: ENV.WAVE_PAY_MINI_APP_CLIENT_ID,
+      client_secret: ENV.WAVE_PAY_MINI_APP_CLIENT_SECRET,
+      grant_type: 'client_credentials',
+    });
+    expect(set).toHaveBeenCalledWith(
+      expect.stringContaining('myanmar-payments.wave-pay-mini-app.token.'),
+      'mini-token',
+      7140 * 1000,
+    );
+
+    await payments.wavePayMiniApp().forgetToken();
+    expect(await payments.wavePayMiniApp().accessToken()).toBe('mini-token');
+    expect(fetch.requests).toHaveLength(2);
+  });
+
+  it('shares the token between modules using the same cache store', async () => {
+    const fetch = fakeFetch(miniAppRoutes);
+    const tokenCache = new MemoryTokenCache();
+    for (let i = 0; i < 2; i++) {
+      const moduleRef = await compile([
+        MyanmarPaymentsModule.forRoot({ env: ENV, fetch, tokenCache }),
+      ]);
+      expect(await moduleRef.get(MyanmarPaymentsService).wavePayMiniApp().accessToken()).toBe(
+        'mini-token',
+      );
+    }
+    expect(fetch.requests).toHaveLength(1);
+  });
+});
+
 describe('CacheManagerTokenCache', () => {
   function fakeCache(): CacheManagerLike & { items: Map<string, unknown>; ttls: unknown[] } {
     const items = new Map<string, unknown>();

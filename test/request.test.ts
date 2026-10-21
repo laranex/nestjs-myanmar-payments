@@ -4,8 +4,16 @@ import { Acknowledgement, CallbackRequest, PaymentError } from '@laranex/myanmar
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { acknowledge, callbackRequestFrom, type FastifyReplyLike } from '../src/index.js';
+import {
+  acknowledge,
+  callbackRequestFrom,
+  callbackUrlFrom,
+  MyanmarPaymentsService,
+  VerifiedCallbackPipe,
+  type FastifyReplyLike,
+} from '../src/index.js';
 import { MAX_CALLBACK_BODY_BYTES } from '../src/request.js';
+import { ENV } from './helpers.js';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -189,5 +197,104 @@ describe('acknowledge', () => {
       ['header', 'Content-Type', 'text/plain'],
       ['send', ''],
     ]);
+  });
+});
+
+describe('callbackUrlFrom', () => {
+  it.each([
+    [
+      'the protocol, host and path without the query',
+      { protocol: 'https', hostname: 'shop.test', url: '/cb?a=1#x' },
+      'https://shop.test/cb',
+    ],
+    [
+      'the port of the Host header',
+      { protocol: 'http', hostname: 'Shop.test', headers: { host: 'shop.TEST:8080' }, url: '/cb' },
+      'http://Shop.test:8080/cb',
+    ],
+    [
+      'a host name with its port (Fastify 4)',
+      {
+        protocol: 'http',
+        hostname: 'shop.test:3000',
+        headers: { host: 'shop.test:3000' },
+        url: '/cb',
+      },
+      'http://shop.test:3000/cb',
+    ],
+    [
+      'an IPv6 host',
+      { protocol: 'http', hostname: '[::1]', headers: { host: '[::1]:3000' }, url: '/cb' },
+      'http://[::1]:3000/cb',
+    ],
+    [
+      'an IPv6 host with its port',
+      { protocol: 'http', hostname: '[::1]:3000', url: '/cb' },
+      'http://[::1]:3000/cb',
+    ],
+    [
+      'the matching X-Forwarded-Host entry',
+      {
+        protocol: 'HTTPS',
+        hostname: 'pay.shop.test',
+        headers: {
+          host: 'internal:8080',
+          'x-forwarded-host': ['other.test:1', 'pay.shop.test:8443, x.test'],
+        },
+        url: '/cb',
+      },
+      'https://pay.shop.test:8443/cb',
+    ],
+    [
+      'no port when nothing matches',
+      {
+        protocol: 'https',
+        hostname: 'pay.shop.test',
+        headers: { host: 'internal:8080' },
+        url: '/cb',
+      },
+      'https://pay.shop.test/cb',
+    ],
+    [
+      "Express's originalUrl",
+      { protocol: 'http', hostname: 'shop.test', originalUrl: '/api/cb', url: '/cb' },
+      'http://shop.test/api/cb',
+    ],
+    ['http without a protocol, / without a URL', { hostname: 'shop.test' }, 'http://shop.test/'],
+    [
+      'an absolute-form target',
+      { hostname: 'shop.test', url: 'http://shop.test/abs?q' },
+      'http://shop.test/abs',
+    ],
+    ['an unparsable target', { hostname: 'shop.test', url: '*' }, 'http://shop.test/'],
+  ])('builds %s', (_case, request, expected) => {
+    expect(callbackUrlFrom({ headers: {}, ...request })).toBe(expected);
+  });
+
+  it('throws without a host', () => {
+    for (const hostname of [undefined, ' ']) {
+      expect(() => callbackUrlFrom({ headers: {}, hostname, url: '/cb' })).toThrow(
+        'The request has no host to build the callback URL from',
+      );
+    }
+  });
+});
+
+describe('Wave Pay Mini App callbacks outside a route', () => {
+  it('refuses a CallbackRequest in handleCallback()', async () => {
+    const payments = new MyanmarPaymentsService({ env: ENV });
+    await expect(
+      payments.handleCallback('wave-pay-mini-app', CallbackRequest.fromJson({})),
+    ).rejects.toThrow('Wave Pay Mini App callbacks are verified against the request URL');
+  });
+
+  it('needs a reader with the callback URL in VerifiedCallbackPipe', async () => {
+    const pipe = new VerifiedCallbackPipe(new MyanmarPaymentsService({ env: ENV }));
+    await expect(
+      pipe.transform(() => Promise.resolve(CallbackRequest.fromJson({})), {
+        type: 'custom',
+        data: 'wave-pay-mini-app',
+      }),
+    ).rejects.toThrow('The callback request reader has no callback URL.');
   });
 });

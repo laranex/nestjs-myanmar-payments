@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import {
   Amount,
   AyaPay,
@@ -7,7 +9,10 @@ import {
   KbzPay,
   KbzPayConfig,
   MemoryTokenCache,
+  MiniAppPayment,
   WavePay,
+  WavePayMiniApp,
+  WavePayMiniAppConfig,
   YomaMmqr,
 } from '@laranex/myanmar-payments';
 import { Inject, Injectable, Module } from '@nestjs/common';
@@ -21,8 +26,10 @@ import {
   InjectCyberSource,
   InjectKbzPay,
   InjectWavePay,
+  InjectWavePayMiniApp,
   InjectYomaMmqr,
   KBZ_PAY,
+  WAVE_PAY_MINI_APP,
   MYANMAR_PAYMENTS_OPTIONS,
   MyanmarPaymentsModule,
   MyanmarPaymentsService,
@@ -56,6 +63,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
 
     expect(payments.kbzPay()).toBeInstanceOf(KbzPay);
     expect(payments.wavePay()).toBeInstanceOf(WavePay);
+    expect(payments.wavePayMiniApp()).toBeInstanceOf(WavePayMiniApp);
     expect(payments.ayaPay()).toBeInstanceOf(AyaPay);
     expect(payments.yomaMmqr()).toBeInstanceOf(YomaMmqr);
     expect(payments.cyberSource()).toBeInstanceOf(CyberSource);
@@ -64,12 +72,21 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(payments.kbzPay().config.timeoutSeconds).toBe(30);
     expect(payments.wavePay().config.timeToLiveSeconds).toBe(300);
     expect(payments.yomaMmqr().config.apiVersion).toBe('v1rc');
+    expect(payments.wavePayMiniApp().config).toMatchObject({
+      clientId: 'mini-client',
+      clientSecret: 'mini-secret',
+      miniAppId: 'MINI456',
+      secretKey: 'mini-hash-secret',
+      baseUrl: 'https://wave-mini.test',
+      timeoutSeconds: 30,
+    });
   });
 
   it('reuses each gateway', async () => {
     const payments = await service([MyanmarPaymentsModule.forRoot({ env: ENV })]);
     expect(payments.kbzPay()).toBe(payments.kbzPay());
     expect(payments.yomaMmqr()).toBe(payments.yomaMmqr());
+    expect(payments.wavePayMiniApp()).toBe(payments.wavePayMiniApp());
   });
 
   it('reads process.env by default', async () => {
@@ -110,6 +127,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
         env: { ...ENV, MYANMAR_PAYMENTS_HTTP_TIMEOUT: '12' },
         kbzPay: { appId: 'explicit', appKey: undefined },
         wavePay: { merchantName: 'Option shop' },
+        wavePayMiniApp: { miniAppId: 'OPTION_APP', secretKey: undefined },
         cyberSource: { profileId: 'option-profile' },
       }),
     ]);
@@ -122,6 +140,12 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(payments.wavePay().config).toMatchObject({
       merchantName: 'Option shop',
       merchantId: ENV.WAVE_PAY_MERCHANT_ID,
+      timeoutSeconds: 12,
+    });
+    expect(payments.wavePayMiniApp().config).toMatchObject({
+      miniAppId: 'OPTION_APP',
+      secretKey: ENV.WAVE_PAY_MINI_APP_SECRET_KEY,
+      clientId: ENV.WAVE_PAY_MINI_APP_CLIENT_ID,
       timeoutSeconds: 12,
     });
     expect(payments.cyberSource().config).toMatchObject({
@@ -161,8 +185,18 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       timeoutSeconds: 30,
       ...KBZ_URLS,
     });
-    const payments = await service([MyanmarPaymentsModule.forRoot({ kbzPay: config, env: {} })]);
+    const miniApp = new WavePayMiniAppConfig({
+      clientId: 'c',
+      clientSecret: 's',
+      miniAppId: 'APP',
+      secretKey: 'k',
+      baseUrl: WavePayMiniAppConfig.PRODUCTION_URL,
+    });
+    const payments = await service([
+      MyanmarPaymentsModule.forRoot({ kbzPay: config, wavePayMiniApp: miniApp, env: {} }),
+    ]);
     expect(payments.kbzPay().config).toBe(config);
+    expect(payments.wavePayMiniApp().config).toBe(miniApp);
   });
 
   it('boots without credentials and names the missing one on first use', async () => {
@@ -171,17 +205,21 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       expect(() => payments.gateway(name)).toThrow(ConfigurationError);
     }
     expect(() => payments.kbzPay()).toThrow('The kbz_pay configuration is missing [app_id].');
+    expect(() => payments.wavePayMiniApp()).toThrow(
+      'The wave_pay_mini_app configuration is missing [client_id].',
+    );
   });
 
   it('maps gateway names and rejects unknown ones', async () => {
     const payments = await service([MyanmarPaymentsModule.forRoot({ env: ENV })]);
     expect(payments.gateway('kbz-pay')).toBe(payments.kbzPay());
     expect(payments.gateway('wave-pay')).toBe(payments.wavePay());
+    expect(payments.gateway('wave-pay-mini-app')).toBe(payments.wavePayMiniApp());
     expect(payments.gateway('aya-pay')).toBe(payments.ayaPay());
     expect(payments.gateway('yoma-mmqr')).toBe(payments.yomaMmqr());
     expect(payments.gateway('cyber-source')).toBe(payments.cyberSource());
     expect(() => payments.gateway('paypal' as GatewayName)).toThrow(
-      'Unknown payment gateway [paypal]; use one of kbz-pay, wave-pay, aya-pay, yoma-mmqr, cyber-source.',
+      'Unknown payment gateway [paypal]; use one of kbz-pay, wave-pay, wave-pay-mini-app, aya-pay, yoma-mmqr, cyber-source.',
     );
   });
 
@@ -201,6 +239,40 @@ describe('MyanmarPaymentsModule.forRoot', () => {
     expect(fetch.calls).toHaveLength(1);
   });
 
+  it('signs a Wave Pay Mini App payment without calling the gateway', async () => {
+    const fetch = fakeFetch({});
+    const payments = await service([MyanmarPaymentsModule.forRoot({ env: ENV, fetch })]);
+    const payment = payments.wavePayMiniApp().payment({
+      orderId: 'ORDER_MINI_1',
+      callbackUrl: 'https://shop.test/payments/callback/wave-pay-mini-app',
+      merchantReferenceId: 'ref-001',
+      items: [
+        { name: 'Ticket', amount: 3000 },
+        { name: 'Snack', amount: Amount.kyat(2000) },
+      ],
+    });
+    expect(payment).toBeInstanceOf(MiniAppPayment);
+    expect(payment.flow).toBe('mini_app');
+    expect(JSON.parse(JSON.stringify(payment))).toEqual({
+      amount: 5000,
+      miniAppID: 'MINI456',
+      merchantRefID: 'ref-001',
+      orderID: 'ORDER_MINI_1',
+      callBackUrl: 'https://shop.test/payments/callback/wave-pay-mini-app',
+      hashValue: createHmac('sha256', ENV.WAVE_PAY_MINI_APP_SECRET_KEY)
+        .update(
+          '5000ORDER_MINI_1MINI456ref-001https://shop.test/payments/callback/wave-pay-mini-app',
+        )
+        .digest('hex'),
+      items: [
+        { name: 'Ticket', amount: 3000 },
+        { name: 'Snack', amount: 2000 },
+      ],
+    });
+    expect(payment.toJsonString()).toBe(JSON.stringify(payment));
+    expect(fetch.calls).toHaveLength(0);
+  });
+
   it('defaults the HTTP timeout to 30 seconds when it is unset or blank', async () => {
     const without = (key: keyof typeof ENV): Record<string, string> =>
       Object.fromEntries(Object.entries(ENV).filter(([name]) => name !== key));
@@ -212,6 +284,7 @@ describe('MyanmarPaymentsModule.forRoot', () => {
       for (const config of [
         payments.kbzPay().config,
         payments.wavePay().config,
+        payments.wavePayMiniApp().config,
         payments.ayaPay().config,
         payments.yomaMmqr().config,
       ]) {
@@ -428,6 +501,7 @@ describe('gateway injection', () => {
     constructor(
       @InjectKbzPay() readonly kbzPay: KbzPay,
       @InjectWavePay() readonly wavePay: WavePay,
+      @InjectWavePayMiniApp() readonly wavePayMiniApp: WavePayMiniApp,
       @InjectAyaPay() readonly ayaPay: AyaPay,
       @InjectYomaMmqr() readonly yomaMmqr: YomaMmqr,
       @InjectCyberSource() readonly cyberSource: CyberSource,
@@ -447,6 +521,7 @@ describe('gateway injection', () => {
     const injected = await gateways({ env: ENV });
     expect(injected.kbzPay).toBeInstanceOf(KbzPay);
     expect(injected.wavePay).toBeInstanceOf(WavePay);
+    expect(injected.wavePayMiniApp).toBeInstanceOf(WavePayMiniApp);
     expect(injected.ayaPay).toBeInstanceOf(AyaPay);
     expect(injected.yomaMmqr).toBeInstanceOf(YomaMmqr);
     expect(injected.cyberSource).toBeInstanceOf(CyberSource);
@@ -456,6 +531,17 @@ describe('gateway injection', () => {
     expect(injected.ayaPay.config.appKey).toBe('aya-key');
     expect(injected.yomaMmqr.config.merchantId).toBe('M001');
     expect(injected.cyberSource.config.profileId).toBe('profile');
+    expect(injected.wavePayMiniApp.config.miniAppId).toBe('MINI456');
+  });
+
+  it('injects the Wave Pay Mini App gateway the service builds', async () => {
+    const moduleRef = await Test.createTestingModule({
+      imports: [MyanmarPaymentsModule.forRoot({ env: ENV })],
+    }).compile();
+    const miniApp = moduleRef.get<WavePayMiniApp>(WAVE_PAY_MINI_APP);
+    const service = moduleRef.get(MyanmarPaymentsService);
+    expect(miniApp.config).toBe(service.wavePayMiniApp().config);
+    expect(miniApp.signer).toBe(service.wavePayMiniApp().signer);
   });
 
   it('forwards methods and fields to the gateway the service builds', async () => {

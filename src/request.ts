@@ -23,6 +23,16 @@ export interface NestRequestLike {
   url?: string | undefined;
   /** Express's full URL, when the app is mounted under a path. */
   originalUrl?: string | undefined;
+  /**
+   * `http` or `https`, as the framework resolves it: `X-Forwarded-Proto` counts only from a proxy
+   * the app trusts (Express `trust proxy`, Fastify `trustProxy`).
+   */
+  protocol?: string | undefined;
+  /**
+   * The host name, as the framework resolves it: `X-Forwarded-Host` counts only from a proxy the
+   * app trusts.
+   */
+  hostname?: string | undefined;
   /** The exact body bytes, set by Nest when the app is created with `rawBody: true`. */
   rawBody?: unknown;
   /** The body parsed by Express's or Fastify's body parser. */
@@ -107,6 +117,89 @@ export async function callbackRequestFrom(
     );
   }
   return limited(CallbackRequest.from({ body: parsed.body, headers: parsed.headers, query }));
+}
+
+/**
+ * The URL a request was sent to, without its query string: the protocol and host name the framework
+ * resolves (so `X-Forwarded-Proto` and `X-Forwarded-Host` count only from a proxy the app trusts:
+ * Express `trust proxy`, Fastify `trustProxy`), the port of the matching `Host` (or trusted
+ * `X-Forwarded-Host`) value, and the path as received (Express `originalUrl`, so a mounted app keeps
+ * its mount path). Wave Pay Mini App callbacks are verified against it. Throws when the request has
+ * no host.
+ */
+export function callbackUrlFrom(request: NestRequestLike): string {
+  const hostname = typeof request.hostname === 'string' ? request.hostname.trim() : '';
+  if (hostname === '') {
+    throw new Error(
+      'The request has no host to build the callback URL from; pass the callback URL to the gateway yourself.',
+    );
+  }
+  const protocol =
+    typeof request.protocol === 'string' && request.protocol.trim() !== ''
+      ? request.protocol.trim().toLowerCase().replace(/:$/, '')
+      : 'http';
+  return `${protocol}://${authority(request, hostname)}${requestPath(request)}`;
+}
+
+/**
+ * The host name with its port. Fastify 4 keeps the port in `hostname`; Express and Fastify 5 drop
+ * it, so it comes from the `Host` value the host name was read from, else from the matching
+ * `X-Forwarded-Host` entry (only used when the framework trusted it, since the host name differs).
+ */
+function authority(request: NestRequestLike, hostname: string): string {
+  if (hostPort(hostname) !== '') {
+    return hostname;
+  }
+  const forwarded = request.headers['x-forwarded-host'];
+  const candidates = [
+    ...headerValues(request.headers.host),
+    ...headerValues(forwarded).flatMap((value) => value.split(',')),
+  ]
+    .map((value) => value.trim())
+    .filter((value) => value !== '');
+  const wanted = hostname.toLowerCase();
+  const match = candidates.find((value) => hostPart(value).toLowerCase() === wanted);
+  return match === undefined ? hostname : `${hostname}${hostPort(match)}`;
+}
+
+/** The host part of `host[:port]`, keeping an IPv6 literal's brackets. */
+function hostPart(value: string): string {
+  if (value.startsWith('[')) {
+    return value.slice(0, value.indexOf(']') + 1);
+  }
+  const index = value.indexOf(':');
+  return index === -1 ? value : value.slice(0, index);
+}
+
+/** The `:port` of `host[:port]`, or `''`. */
+function hostPort(value: string): string {
+  return /(:\d+)$/.exec(value.slice(hostPart(value).length))?.[1] ?? '';
+}
+
+function headerValues(value: string | readonly string[] | undefined): string[] {
+  return value === undefined ? [] : typeof value === 'string' ? [value] : [...value];
+}
+
+/** The request path as received, without the query string or fragment. */
+function requestPath(request: NestRequestLike): string {
+  const target = request.originalUrl ?? request.url ?? '/';
+  const path = target.replace(/[?#][^]*$/, '');
+  if (path.startsWith('/')) {
+    return path;
+  }
+  // An absolute-form request target (`http://host/path`).
+  try {
+    return new URL(path).pathname;
+  } catch {
+    return '/';
+  }
+}
+
+/** Whether `request` is the SDK's `CallbackRequest` (also across ESM and CommonJS copies). @internal */
+export function isCallbackRequest(
+  request: CallbackRequest | NestRequestLike,
+): request is CallbackRequest {
+  return request instanceof CallbackRequest || isCallbackRequestLike(request);
 }
 
 /**

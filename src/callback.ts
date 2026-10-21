@@ -2,6 +2,7 @@ import {
   SignatureVerificationError,
   type CallbackRequest,
   type PaymentCallback,
+  type WavePayMiniApp,
 } from '@laranex/myanmar-payments';
 import {
   applyDecorators,
@@ -24,15 +25,27 @@ import { map } from 'rxjs/operators';
 
 import type { GatewayName } from './gateways.js';
 import { MyanmarPaymentsService } from './myanmar-payments.service.js';
-import { callbackRequestFrom, isPaymentCallback, type NestRequestLike } from './request.js';
+import {
+  callbackRequestFrom,
+  callbackUrlFrom,
+  isPaymentCallback,
+  type NestRequestLike,
+} from './request.js';
 
-/** Reads the request's body when called, so the pipes decide when (and whether) it is read. */
-export type CallbackRequestReader = () => Promise<CallbackRequest>;
+/**
+ * Reads the request's body when called, so the pipes decide when (and whether) it is read.
+ * `callbackUrl` returns the URL the request was posted to ({@link callbackUrlFrom}).
+ */
+export type CallbackRequestReader = (() => Promise<CallbackRequest>) & {
+  callbackUrl?: (() => string) | undefined;
+};
 
 const callbackRequestParam = createParamDecorator(
   (_gateway: unknown, context: ExecutionContext): CallbackRequestReader => {
     const request = context.switchToHttp().getRequest<NestRequestLike>();
-    return () => callbackRequestFrom(request);
+    return Object.assign(() => callbackRequestFrom(request), {
+      callbackUrl: () => callbackUrlFrom(request),
+    });
   },
 );
 
@@ -57,7 +70,8 @@ export class CallbackRequestPipe implements PipeTransform<
 
 /**
  * Injects the callback verified by the named gateway as the SDK's `PaymentCallback`. A bad
- * signature answers `400 Bad Request` before the handler runs.
+ * signature answers `400 Bad Request` before the handler runs. `wave-pay-mini-app` verifies
+ * against the URL the callback was posted to ({@link callbackUrlFrom}).
  *
  * ```ts
  * @Post('callback/kbz-pay')
@@ -84,8 +98,16 @@ export class VerifiedCallbackPipe implements PipeTransform<
     try {
       // Resolve the gateway (unknown name, missing settings) before reading the body, like
       // handleCallback() and the other framework packages.
-      this.payments.gateway(metadata.data as GatewayName);
-      return await this.payments.handleCallback(metadata.data as GatewayName, await read());
+      const name = metadata.data as GatewayName;
+      const gateway = this.payments.gateway(name);
+      if (name === 'wave-pay-mini-app') {
+        if (read.callbackUrl === undefined) {
+          throw new Error('The callback request reader has no callback URL.');
+        }
+        const callbackUrl = read.callbackUrl();
+        return (gateway as WavePayMiniApp).handleCallback(await read(), callbackUrl);
+      }
+      return await this.payments.handleCallback(name, await read());
     } catch (error) {
       if (error instanceof SignatureVerificationError) {
         throw new BadRequestException(error.message);

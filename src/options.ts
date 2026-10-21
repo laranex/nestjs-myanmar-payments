@@ -12,6 +12,8 @@ import type {
   TokenCache,
   WavePayConfig,
   WavePayConfigOptions,
+  WavePayMiniAppConfig,
+  WavePayMiniAppConfigOptions,
   YomaMmqrConfig,
   YomaMmqrConfigOptions,
 } from '@laranex/myanmar-payments';
@@ -43,8 +45,9 @@ export interface FormLinkOptions {
 /**
  * The module options. Each gateway is built the first time it is used, from its options merged
  * per setting with the environment the SDK's `fromEnv` reads (`KBZ_PAY_*`, `WAVE_PAY_*`,
- * `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*` and `MYANMAR_PAYMENTS_HTTP_TIMEOUT`): a setting given
- * here (not `undefined`) wins, every other one comes from its variable. An SDK config instance
+ * `WAVE_PAY_MINI_APP_*`, `AYA_PAY_*`, `YOMA_MMQR_*`, `CYBER_SOURCE_*` and
+ * `MYANMAR_PAYMENTS_HTTP_TIMEOUT`): a setting given here (not `undefined`) wins, every other one
+ * comes from its variable. An SDK config instance
  * (e.g. `new KbzPayConfig(...)`) is used as it is.
  */
 export interface MyanmarPaymentsModuleOptions {
@@ -52,6 +55,8 @@ export interface MyanmarPaymentsModuleOptions {
   kbzPay?: KbzPayConfig | GatewaySettings<KbzPayConfigOptions> | undefined;
   /** Wave Pay settings; the rest come from `WAVE_PAY_*`. */
   wavePay?: WavePayConfig | GatewaySettings<WavePayConfigOptions> | undefined;
+  /** Wave Pay Mini App settings; the rest come from `WAVE_PAY_MINI_APP_*`. */
+  wavePayMiniApp?: WavePayMiniAppConfig | GatewaySettings<WavePayMiniAppConfigOptions> | undefined;
   /** AYA Pay settings; the rest come from `AYA_PAY_*`. */
   ayaPay?: AyaPayConfig | GatewaySettings<AyaPayConfigOptions> | undefined;
   /** Yoma MMQR settings; the rest come from `YOMA_MMQR_*`. */
@@ -68,7 +73,10 @@ export interface MyanmarPaymentsModuleOptions {
    * `MYANMAR_PAYMENTS_HTTP_TIMEOUT`, else 30 seconds).
    */
   httpClient?: HttpClient | undefined;
-  /** Keeps Yoma MMQR's access token. Defaults to Nest's cache manager when present, else memory. */
+  /**
+   * Keeps the Yoma MMQR and Wave Pay Mini App access tokens. Defaults to Nest's cache manager when
+   * present, else memory.
+   */
   tokenCache?: TokenCache | undefined;
   /** Use the `CACHE_MANAGER` of `@nestjs/cache-manager` when it is available (default `true`). */
   useCacheManager?: boolean | undefined;

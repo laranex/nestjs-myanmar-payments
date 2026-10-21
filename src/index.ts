@@ -14,6 +14,7 @@ export {
   KBZ_PAY,
   MYANMAR_PAYMENTS_OPTIONS,
   WAVE_PAY,
+  WAVE_PAY_MINI_APP,
   YOMA_MMQR,
 } from './constants.js';
 export { FormPaymentController } from './form-payment.controller.js';
@@ -23,6 +24,7 @@ export {
   InjectCyberSource,
   InjectKbzPay,
   InjectWavePay,
+  InjectWavePayMiniApp,
   InjectYomaMmqr,
   type GatewayName,
 } from './gateways.js';
@@ -45,6 +47,7 @@ export type {
 export {
   acknowledge,
   callbackRequestFrom,
+  callbackUrlFrom,
   type FastifyReplyLike,
   type NestRequestLike,
 } from './request.js';
